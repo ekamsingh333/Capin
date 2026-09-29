@@ -47,4 +47,319 @@
 <div class="field" id="styles"><label>Caption style</label><div class="presetGrid"><button class="preset active" data-preset="hormozi" style="--p:#f5ff3d"><b>Hormozi</b><span>Yellow active word</span></button><button class="preset" data-preset="neon" style="--p:#55e9ff"><b>Cyber Neon</b><span>Cyan glow</span></button><button class="preset" data-preset="clean" style="--p:#fff"><b>Clean</b><span>Minimal subtitles</span></button><button class="preset" data-preset="pop" style="--p:#ff6bff"><b>Bold Pop</b><span>Active word card</span></button><button class="preset" data-preset="karaoke" style="--p:#ffd21c"><b>Karaoke</b><span>Word-by-word highlight</span></button></div></div>
 <div class="two"><div class="field"><label>Font <span id="fontLabel">Space Grotesk</span></label><select id="font"><option value="Space Grotesk">Space Grotesk</option><option value="DM Sans">DM Sans</option><option value="Arial">Arial</option><option value="Georgia">Georgia</option></select></div><div class="field"><label>Text case</label><select id="case"><option value="upper">UPPERCASE</option><option value="normal">Normal</option><option value="lower">lowercase</option></select></div></div>
 <div class="field"><label>Font size <span id="sizeOut">42 px</span></label><div class="rangeRow"><input class="range" id="fontSize" type="range" min="18" max="78" value="42"><output>42</output></div></div>
-<div class="two"><div class="field"><label>Text color</label><input class="control" id="textColor" type="color" value="#ffffff"></div><div class="field"><label>Highli
+<div class="two"><div class="field"><label>Text color</label><input class="control" id="textColor" type="color" value="#ffffff"></div><div class="field"><label>Highlight color</label><input class="control" id="highlightColor" type="color" value="#f5ff3d"></div></div>
+<div class="two"><div class="field"><label>Stroke <span id="strokeOut">5</span></label><div class="rangeRow"><input class="range" id="stroke" type="range" min="0" max="12" value="5"><output>5</output></div></div><div class="field"><label>Glow <span id="glowOut">12</span></label><div class="rangeRow"><input class="range" id="glow" type="range" min="0" max="35" value="12"><output>12</output></div></div></div>
+</div>
+<div class="actions"><button class="btn primary" id="generate" disabled>Generate AI captions</button><button class="btn cyan" id="exportVideo" disabled>Export captioned video</button></div>
+<div class="status"><div class="statusline"><span id="statusText">Choose a video to begin.</span><b id="statusPct">0%</b></div><div class="bar"><i id="progress"></i></div></div><div id="error" class="error hidden"></div>
+<details style="margin-top:14px"><summary style="cursor:pointer;color:#bbb;font-size:12px;font-weight:700">Use my own transcript / SRT</summary><div style="color:#777;font-size:11px;line-height:1.5;margin:9px 0">Paste plain text or SRT. SRT timings are preserved; plain text is aligned against detected speech regions.</div><textarea id="transcript" rows="5" placeholder="Paste Punjabi / Hindi / English transcript or SRT…"></textarea><button class="btn" id="useText" style="margin-top:9px" disabled>Use transcript</button></details>
+</div></div>
+<div class="card editorCard hidden" id="editor"><div class="cardHead"><div><h2>02 — Word editor</h2><span class="sub">Click a word to seek. Edit text or timing.</span></div><div class="editorToolbar"><button class="btn" id="addWord">+ Word</button><button class="btn" id="resetWords">Reset</button></div></div><div class="wordTable" id="words"></div></div>
+</div>
+<div>
+<div class="card previewCard"><div class="cardHead"><div><h2>Live preview</h2><span class="sub">Your final caption layer, frame by frame.</span></div><span class="eyebrow" id="timeBadge">00:00</span></div><div class="previewStage"><div class="previewWrap" id="previewWrap"><video id="video" controls playsinline></video><div id="overlay" class="overlay bottom"></div></div></div><div class="previewTools"><button class="toolPill active" id="playPause">▶ Play</button><button class="toolPill" id="muteBtn">🔊 Sound</button><button class="toolPill" id="fitBtn">Fit</button><button class="toolPill" id="clearPreview">Clear preview</button></div><div class="timeline"><div class="timelineTop"><b>Caption timeline</b><span id="timelineDuration">00:00</span></div><div class="track" id="track"><div class="playhead" id="playhead"></div></div></div></div>
+<div class="card" style="margin-top:16px" id="export"><div class="cardHead"><div><h2>03 — Export</h2><span class="sub">Real-time canvas + audio recording.</span></div></div><div class="cardBody"><div style="font-size:12px;color:#aaa;line-height:1.6">The browser renders the video and caption layer together. Export speed is real-time, so a 60-second clip takes about 60 seconds.</div><div id="downloadBox" class="download hidden"><b>Export complete</b><br><a id="downloadLink" href="#" download>Download video</a><div class="tiny" id="formatNote"></div></div></div></div>
+</div></section>
+<footer class="footer">CAPIN — local-first AI captions • Whisper via Transformers.js • No server required</footer>
+</div></div><div id="toast" class="toast"></div>
+<script type="module">
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+env.allowLocalModels=false; env.useBrowserCache=true;
+const TARGET_SR=16000;
+const $=id=>document.getElementById(id);
+const video=$("video"),overlay=$("overlay"),drop=$("drop"),fileEl=$("videoInput"),generate=$("generate"),exportVideo=$("exportVideo"),useText=$("useText");
+const statusText=$("statusText"),statusPct=$("statusPct"),progress=$("progress"),errorBox=$("error"),wordsEl=$("words"),previewWrap=$("previewWrap"),track=$("track"),playhead=$("playhead");
+let currentFile=null,videoURL=null,transcriber=null,loadedModel=null,words=[],groups=[],originalWords=[],preset="hormozi",lastRenderKey="",raf=0,exporting=false;
+let settings={font:'Space Grotesk',size:42,text:'#ffffff',highlight:'#f5ff3d',stroke:5,glow:12,position:'bottom',case:'upper'};
+function setProgress(p,msg){p=Math.max(0,Math.min(100,Number(p)||0));progress.style.width=p+'%';statusPct.textContent=Math.round(p)+'%';if(msg)statusText.textContent=msg}
+function error(m){errorBox.textContent=m;errorBox.classList.remove('hidden')}
+function clearError(){errorBox.textContent='';errorBox.classList.add('hidden')}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2200)}
+function fmt(s){if(!isFinite(s))return '00:00';let m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')}
+function isVideoFile(f){if(!f)return false;const t=(f.type||'').toLowerCase(),n=(f.name||'').toLowerCase();return t.startsWith('video/')||/\.(mp4|webm|mov|m4v|mkv|avi|3gp|mpeg|mpg|ogv)$/i.test(n)}
+function resetAfterFile(){generate.disabled=false;useText.disabled=false;exportVideo.disabled=true;$("downloadBox").classList.add('hidden');$("editor").classList.add('hidden');words=[];groups=[];originalWords=[]}
+function loadVideoToCanvas(url,sourceFile){return new Promise((resolve,reject)=>{const old=videoURL;if(old&&old!==url)try{URL.revokeObjectURL(old)}catch(_){}videoURL=url;currentFile=sourceFile;video.pause();video.removeAttribute('src');video.load();const ok=()=>{cleanup();clearError();resetAfterFile();setProgress(0,'Video loaded. Generate captions or paste your transcript.');toast('Video ready');resolve(true)};const bad=()=>{cleanup();reject(new Error('Android could not decode this local video URL.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('canplay',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('canplay',ok,{once:true});video.addEventListener('error',bad,{once:true});video.src=url;video.load();setTimeout(()=>{if(video.readyState>=1)ok()},1200)})}
+function readFileFallback(file){return new Promise((resolve,reject)=>{setProgress(1,'Reading video through Android file fallback…');const reader=new FileReader();reader.onload=async evt=>{try{const blob=new Blob([evt.target.result],{type:file.type||'video/mp4'});const u=URL.createObjectURL(blob);await loadVideoToCanvas(u,blob);resolve(blob)}catch(e){reject(e)}};reader.onerror=()=>reject(reader.error||new Error('Android FileReader could not read this video.'));reader.onabort=()=>reject(new Error('Video file read was cancelled.'));reader.readAsArrayBuffer(file)})}
+async function setFile(f){if(!f)return;if(!isVideoFile(f)){error('Please choose a video file such as MP4, MOV, WebM or MKV.');return}clearError();try{const u=URL.createObjectURL(f);try{await loadVideoToCanvas(u,f)}catch(firstError){try{if(u)URL.revokeObjectURL(u)}catch(_){}await readFileFallback(f)}}catch(e){error('Android could not open this video. If it is only in Google Photos/cloud storage, first download it to Device Storage/Files and select it there.');setProgress(0,'Choose a locally downloaded video from Files.');toast('Could not open video')}}
+$("choose").onclick=e=>{e.stopPropagation();try{fileEl.value=''}catch(_){}fileEl.click()};drop.onclick=e=>{if(e.target!==$("choose"))fileEl.click()};fileEl.onchange=e=>setFile(e.target.files?.[0]);drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');setFile(e.dataTransfer.files?.[0])};$("jumpUpload").onclick=()=>drop.scrollIntoView({behavior:'smooth',block:'center'});$("demoBtn").onclick=()=>{toast('Upload a video to activate the live editor')};
+async function getTranscriber(model){if(transcriber&&loadedModel===model)return transcriber;setProgress(5,'Loading Whisper model… first use downloads model files.');const cb=p=>{if(p.status==='progress')setProgress(5+(p.progress||0)*.3,'Downloading model… '+Math.round(p.progress||0)+'%')};if(model.includes('turbo')){if(!navigator.gpu)throw new Error('Large-v3 Turbo needs WebGPU. Use Base or Small on this browser.');transcriber=await pipeline('automatic-speech-recognition',model,{device:'webgpu',dtype:{encoder_model:'fp16',decoder_model_merged:'q4'},progress_callback:cb})}else transcriber=await pipeline('automatic-speech-recognition',model,{device:'wasm',dtype:'q8',progress_callback:cb});loadedModel=model;return transcriber}
+async function audioFromVideo(file){
+ setProgress(3,'Extracting audio in small mobile-safe chunks…');
+ const bytes=await file.arrayBuffer();
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC)throw new Error('Web Audio is not supported in this browser.');
+ const ctx=new AC({sampleRate:TARGET_SR});
+ let audioBuffer=null;
+ try{
+  audioBuffer=await ctx.decodeAudioData(bytes.slice(0));
+  const n=audioBuffer.length,channels=audioBuffer.numberOfChannels,out=new Float32Array(n);
+  const sliceFrames=Math.max(1,Math.floor(audioBuffer.sampleRate*5));
+  const data=Array.from({length:channels},(_,c)=>audioBuffer.getChannelData(c));
+  for(let start=0;start<n;start+=sliceFrames){
+   const end=Math.min(n,start+sliceFrames);
+   for(let i=start;i<end;i++){
+    let v=0;for(let c=0;c<channels;c++)v+=data[c][i]||0;
+    out[i]=v/Math.max(1,channels);
+   }
+   setProgress(5+(end/n)*28,'Preparing audio… '+Math.round(end/n*100)+'%');
+   await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  setProgress(34,'Audio ready — starting AI transcription…');
+  return out;
+ }finally{
+  audioBuffer=null;
+  try{await ctx.close()}catch(_){}
+ }
+}
+
+const WORKER_CDN='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+let whisperWorker=null,whisperWorkerURL=null,workerSeq=0;
+let smoothRAF=0,smoothValue=0,smoothTarget=0;
+function smoothProgress(target,msg){
+ smoothTarget=Math.max(0,Math.min(100,target));
+ if(msg)statusText.textContent=msg;
+ if(smoothRAF)return;
+ const step=()=>{
+  smoothValue+=(smoothTarget-smoothValue)*.16;
+  if(Math.abs(smoothTarget-smoothValue)<.15)smoothValue=smoothTarget;
+  progress.style.width=smoothValue+'%';statusPct.textContent=Math.round(smoothValue)+'%';
+  if(Math.abs(smoothTarget-smoothValue)>.15)smoothRAF=requestAnimationFrame(step);else smoothRAF=0;
+ };
+ smoothRAF=requestAnimationFrame(step);
+}
+function createWhisperWorker(){
+ if(whisperWorker)return whisperWorker;
+ const source=`
+ import { pipeline, env } from '${WORKER_CDN}';
+ env.allowLocalModels=false; env.useBrowserCache=true;
+ let pipe=null,modelName='';
+ const send=(id,type,payload={})=>self.postMessage({id,type,...payload});
+ self.onmessage=async(e)=>{
+  const {id,type,model,chunk,language}=e.data;
+  try{
+   if(type==='load'){
+    if(!pipe||modelName!==model){
+     const cb=p=>{if(p.status==='progress')send(id,'load-progress',{progress:p.progress||0})};
+     pipe=await pipeline('automatic-speech-recognition',model,{device:model.includes('turbo')?'webgpu':'wasm',dtype:model.includes('turbo')?{encoder_model:'fp16',decoder_model_merged:'q4'}:'q8',progress_callback:cb});
+     modelName=model;
+    }
+    send(id,'loaded',{model:modelName});return;
+   }
+   if(type==='transcribe'){
+    if(!pipe||modelName!==model)throw new Error('Whisper model is not loaded.');
+    const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:5,stride_length_s:.5,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};
+    if(language&&language!=='auto')opts.language=language;
+    const result=await pipe(chunk,opts);
+    send(id,'result',{result});return;
+   }
+  }catch(err){send(id,'error',{message:String(err?.message||err)})}
+ };`;
+ const blob=new Blob([source],{type:'application/javascript'});
+ whisperWorkerURL=URL.createObjectURL(blob);
+ try{whisperWorker=new Worker(whisperWorkerURL,{type:'module',name:'CAPIN-Whisper'});return whisperWorker}catch(e){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null;whisperWorker=null;throw e}
+}
+function destroyWhisperWorker(){if(whisperWorker){try{whisperWorker.terminate()}catch(_){}whisperWorker=null}if(whisperWorkerURL){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null}}
+function workerRequest(type,payload,timeoutMs=20000){
+ const w=createWhisperWorker(),id=++workerSeq;
+ return new Promise((resolve,reject)=>{
+  let done=false;
+  const timer=setTimeout(()=>finish(new Error('TIMEOUT:AI processing taking too long')),timeoutMs);
+  const handler=e=>{const m=e.data||{};if(m.id!==id)return;if(m.type==='load-progress'){smoothProgress(8+(m.progress||0)*30,'Loading Whisper model… '+Math.round(m.progress||0)+'%');return}if(m.type==='loaded')finish(null,m);else if(m.type==='result')finish(null,m.result);else if(m.type==='error')finish(new Error(m.message||'Whisper worker error'))};
+  const finish=(err,val)=>{if(done)return;done=true;clearTimeout(timer);w.removeEventListener('message',handler);err?reject(err):resolve(val)};
+  w.addEventListener('message',handler);
+  try{if(payload.chunk)w.postMessage({id,type,...payload},[payload.chunk.buffer]);else w.postMessage({id,type,...payload})}catch(e){finish(e)}
+ });
+}
+async function transcribeWithWorker(audio,model,lang){
+ await workerRequest('load',{model},30000);
+ const CHUNK=5*TARGET_SR,OVERLAP=Math.floor(.5*TARGET_SR),step=CHUNK-OVERLAP,total=audio.length,all=[];
+ for(let start=0;start<total;start+=step){
+  const end=Math.min(total,start+CHUNK),chunk=audio.slice(start,end),offset=start/TARGET_SR;
+  smoothProgress(40+(end/total)*56,'Transcribing speech… '+Math.round(end/total*100)+'%');
+  await new Promise(r=>setTimeout(r,10));
+  const result=await workerRequest('transcribe',{model,language:lang,chunk},20000);
+  const got=parseChunks(result).map(w=>({...w,start:w.start+offset,end:w.end+offset}));
+  if(got.length)all.push(...got);else if(result?.text){
+   const parts=splitWords(result.text),dur=chunk.length/TARGET_SR,totalG=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=offset;
+   for(const p of parts){const d=dur*graphemeLength(p)/totalG;all.push({word:p,start:t,end:t+d});t+=d}
+  }
+  await new Promise(r=>setTimeout(r,10));if(end>=total)break;
+ }
+ return all;
+}
+async function transcribeOnMainThreadFallback(audio,model,lang){
+ const pipe=await getTranscriber(model),CHUNK=5*TARGET_SR,OVERLAP=Math.floor(.5*TARGET_SR),step=CHUNK-OVERLAP,total=audio.length,all=[];
+ for(let start=0;start<total;start+=step){
+  const end=Math.min(total,start+CHUNK),chunk=audio.slice(start,end),offset=start/TARGET_SR;
+  smoothProgress(40+(end/total)*56,'Transcribing speech… '+Math.round(end/total*100)+'%');
+  await new Promise(r=>setTimeout(r,10));
+  const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:5,stride_length_s:.5,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};if(lang!=='auto')opts.language=lang;
+  const result=await pipe(chunk,opts);
+  const got=parseChunks(result).map(w=>({...w,start:w.start+offset,end:w.end+offset}));if(got.length)all.push(...got);
+  await new Promise(r=>setTimeout(r,10));if(end>=total)break;
+ }
+ return all;
+}
+const graphemeSegmenter=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;
+function graphemeLength(s){return graphemeSegmenter?[...graphemeSegmenter.segment(s)].length:Array.from(s||'').length}
+function splitWords(s){return String(s||'').normalize('NFC').trim().split(/\s+/u).filter(Boolean)}
+function parseChunks(r){const out=[];let last=0;for(const c of r?.chunks||[]){const text=String(c.text||'').normalize('NFC').trim();if(!text)continue;if(/\s/u.test(text))return [];let [s,e]=Array.isArray(c.timestamp)?c.timestamp:[null,null];if(s==null)s=last;if(e==null||e<=s)e=s+.4;out.push({word:text,start:Number(s)||0,end:Number(e)||Number(s)+.4});last=e}return out}
+function parseSegments(r){const out=[];let last=0;for(const c of r?.chunks||[]){const parts=splitWords(c.text);if(!parts.length)continue;let[s,e]=Array.isArray(c.timestamp)?c.timestamp:[null,null];if(s==null)s=last;if(e==null||e<=s)e=s+.4*parts.length;const total=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=s;for(const p of parts){const d=(e-s)*graphemeLength(p)/total;out.push({word:p,start:t,end:t+d});t+=d}last=e}return out}
+function toSec(s){const [h,m,x]=s.replace(',','.').split(':');return +h*3600+ +m*60+parseFloat(x)}
+function parseSRT(txt){const out=[],re=/(\d+:\d+:\d+[,.]\d+)\s*-->\s*(\d+:\d+:\d+[,.]\d+)[^\n]*\n([\s\S]*?)(?=\n\s*\n|$)/g;let m;while((m=re.exec(txt.replace(/\r/g,'')))){const parts=m[3].replace(/<[^>]+>/g,' ').trim().split(/\s+/).filter(Boolean);if(!parts.length)continue;const s=toSec(m[1]),e=toSec(m[2]),tot=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=s;for(const p of parts){const d=(e-s)*graphemeLength(p)/tot;out.push({word:p,start:t,end:t+d});t+=d}}return out}
+function speechSpans(a){const fr=800,n=Math.floor(a.length/fr),rms=new Float32Array(n);for(let i=0;i<n;i++){let s=0;for(let j=0;j<fr;j++){const v=a[i*fr+j];s+=v*v}rms[i]=Math.sqrt(s/fr)}const sorted=[...rms].sort((a,b)=>a-b),noise=sorted[Math.floor(n*.1)]||0,peak=sorted[Math.floor(n*.95)]||0,th=noise+(peak-noise)*.12,spans=[];let st=null,gap=0;for(let i=0;i<n;i++){if(rms[i]>th){if(st===null)st=i;gap=0}else if(st!==null&&++gap>8){spans.push([st*.05,(i-gap+1)*.05]);st=null;gap=0}}if(st!==null)spans.push([st*.05,n*.05]);return spans.filter(s=>s[1]-s[0]>.25)}
+function alignText(parts,spans){const total=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p)+1,0)),D=spans.reduce((a,s)=>a+s[1]-s[0],0);let si=0,pos=spans[0]?.[0]||0;return parts.map(p=>{let need=D*(graphemeLength(p)+1)/total,start=null,end=pos;while(need>1e-6&&si<spans.length){const avail=spans[si][1]-pos;if(start===null)start=pos;if(need<=avail){pos+=need;end=pos;need=0}else{need-=avail;end=spans[si][1];si++;if(si<spans.length)pos=spans[si][0]}}return{word:p,start:start??end,end}})}
+generate.onclick=async()=>{
+ if(!currentFile)return;
+ generate.disabled=exportVideo.disabled=true;clearError();
+ try{
+  const audio=await audioFromVideo(currentFile);
+  const model=$("model").value,lang=$("language").value;
+  let resultWords=[];
+  try{
+   resultWords=await transcribeWithWorker(audio,model,lang);
+  }catch(workerErr){
+   const msg=String(workerErr?.message||workerErr);
+   if(msg.startsWith('TIMEOUT:')){
+    destroyWhisperWorker();
+    toast('AI processing taking too long. You can add manual captions or try a lighter model.');
+    error('AI processing took too long on this device. Manual Caption Mode is still available, or try a lighter Whisper model.');
+    setProgress(0,'Manual Caption Mode ready.');
+    return;
+   }
+   try{
+    setProgress(40,'Worker unavailable — switching to mobile-safe fallback…');
+    resultWords=await transcribeOnMainThreadFallback(audio,model,lang);
+   }catch(fallbackErr){
+    throw fallbackErr;
+   }
+  }
+  words=resultWords;
+  if(!words.length)throw new Error('No speech detected.');
+  originalWords=structuredClone(words);finishCaptions();smoothProgress(100,'Captions ready — edit, style, then export.');toast('AI captions generated');
+ }catch(e){
+  if(String(e?.message||e).startsWith('TIMEOUT:')){toast('AI processing taking too long. You can add manual captions or try a lighter model.');error('AI processing took too long. Manual Caption Mode is ready.');setProgress(0,'Manual Caption Mode ready.');return}
+  error('Transcription error: '+(e.message||e));setProgress(0,'Transcription failed — Manual Caption Mode ready.');
+ }finally{generate.disabled=false;exportVideo.disabled=!words.length}
+}
+useText.onclick=async()=>{const txt=$("transcript").value.trim();if(!txt||!currentFile)return;clearError();generate.disabled=exportVideo.disabled=useText.disabled=true;try{let w=parseSRT(txt);if(!w.length){const audio=await audioFromVideo(currentFile);setProgress(60,'Aligning transcript to speech…');let spans=speechSpans(audio);if(!spans.length)spans=[[0,audio.length/TARGET_SR]];w=alignText(txt.split(/\s+/).filter(Boolean),spans)}if(!w.length)throw new Error('Transcript is empty.');words=w;originalWords=structuredClone(words);finishCaptions();setProgress(100,'Transcript ready — timing editor is active.');toast('Transcript loaded')}catch(e){error('Transcript error: '+(e.message||e));setProgress(0,'Failed.')}finally{generate.disabled=false;useText.disabled=false}}
+function finishCaptions(){rebuild();renderWords();renderTimeline();$("editor").classList.remove('hidden');exportVideo.disabled=false;video.currentTime=0;updatePreview(true)}
+function rebuild(){groups=[];const sorted=words.filter(w=>w.word.trim()).sort((a,b)=>a.start-b.start);let cur=null;for(const w of sorted){if(!cur||cur.words.length>=3||w.start-cur.words[cur.words.length-1].end>.8){cur={words:[]};groups.push(cur)}cur.words.push(w)}groups.forEach((g,i)=>{g.start=g.words[0].start;g.end=g.words[g.words.length-1].end+.25;if(groups[i+1])g.end=Math.min(g.end,groups[i+1].words[0].start)})}
+const groupAt=t=>groups.find(g=>t>=g.start-.05&&t<=g.end)||null,isActive=(w,t)=>t>=w.start-.05&&t<=w.end+.1;
+function textCase(s){return settings.case==='upper'?s.toUpperCase():settings.case==='lower'?s.toLowerCase():s}
+function renderWords(){wordsEl.textContent='';words.forEach((w,i)=>{const row=document.createElement('div');row.className='wordRow';row.dataset.i=i;const idx=document.createElement('div');idx.className='idx';idx.textContent=i+1;const wi=document.createElement('input');wi.value=w.word;const si=document.createElement('input');si.type='number';si.step='.01';si.value=w.start.toFixed(2);const ei=document.createElement('input');ei.type='number';ei.step='.01';ei.value=w.end.toFixed(2);const del=document.createElement('button');del.textContent='×';wi.oninput=()=>{w.word=wi.value;rebuild();renderTimeline();updatePreview(true)};si.oninput=()=>{w.start=Number(si.value)||0;rebuild();renderTimeline();updatePreview(true)};ei.oninput=()=>{w.end=Number(ei.value)||0;rebuild();renderTimeline();updatePreview(true)};row.onclick=e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')return;video.currentTime=Math.max(0,w.start)};del.onclick=()=>{words.splice(i,1);rebuild();renderWords();renderTimeline();updatePreview(true)};row.append(idx,wi,si,ei,del);wordsEl.append(row)})}
+function renderTimeline(){track.querySelectorAll('.clip,.tick').forEach(e=>e.remove());const dur=video.duration||Math.max(1,...words.map(w=>w.end));for(let i=0;i<=10;i++){const t=document.createElement('div');t.className='tick';t.style.left=(i/10*100)+'%';track.appendChild(t)}groups.forEach(g=>{const c=document.createElement('div');c.className='clip';c.style.left=(g.start/dur*100)+'%';c.style.width=Math.max(.7,(g.end-g.start)/dur*100)+'%';c.textContent=g.words.map(w=>w.word).join(' ');track.appendChild(c)});$("timelineDuration").textContent=fmt(dur)}
+function updatePreview(force=false){const t=video.currentTime,g=groupAt(t),key=(g?groups.indexOf(g):'x')+'|'+preset+'|'+settings.case+'|'+settings.highlight+g?.words.map(w=>isActive(w,t)?1:0).join('');overlay.style.fontFamily=`${settings.font},'Noto Sans Gurmukhi','Noto Sans Devanagari',system-ui,sans-serif`;overlay.style.fontSize=Math.max(14,settings.size*(video.clientHeight||400)/600)+'px';overlay.style.lineHeight='1.08';overlay.style.color=settings.text;overlay.style.webkitTextStroke=`${settings.stroke}px #000`;overlay.style.textShadow=`0 3px ${Math.max(3,settings.stroke)}px #000,0 0 ${settings.glow}px rgba(0,0,0,.8)`;overlay.className='overlay '+settings.position+(preset==='neon'?' neon':'')+(preset==='clean'?' clean':'')+(preset==='pop'?' pop':'')+(preset==='karaoke'?' karaoke':'');if(force||key!==lastRenderKey){lastRenderKey=key;overlay.textContent='';if(g){g.words.forEach(w=>{const s=document.createElement('span');s.className='w'+(isActive(w,t)?' on':'');s.textContent=' '+textCase(w.word)+' ';if(isActive(w,t))s.style.color=settings.highlight;overlay.append(s)})}}$("timeBadge").textContent=fmt(t);if(video.duration)playhead.style.left=(t/video.duration*100)+'%';document.querySelectorAll('.wordRow').forEach((r,i)=>r.classList.toggle('active',isActive(words[i],t)))}
+function tick(){updatePreview();raf=requestAnimationFrame(tick)}tick();
+video.addEventListener('loadedmetadata',()=>{renderTimeline();$("timelineDuration").textContent=fmt(video.duration)});video.addEventListener('timeupdate',()=>updatePreview(true));video.addEventListener('play',()=>$("playPause").textContent='Ⅱ Pause');video.addEventListener('pause',()=>$("playPause").textContent='▶ Play');$("playPause").onclick=()=>video.paused?video.play():video.pause();$("muteBtn").onclick=()=>{video.muted=!video.muted;$("muteBtn").textContent=video.muted?'🔇 Muted':'🔊 Sound'};$("fitBtn").onclick=()=>{video.style.objectFit=video.style.objectFit==='contain'?'cover':'contain'};$("clearPreview").onclick=()=>{overlay.style.opacity=overlay.style.opacity==='0'?'1':'0'};
+track.onclick=e=>{if(!video.duration)return;const r=track.getBoundingClientRect();video.currentTime=((e.clientX-r.left)/r.width)*video.duration};
+$("addWord").onclick=()=>{const t=video.currentTime||0;words.push({word:'new',start:t,end:t+.45});words.sort((a,b)=>a.start-b.start);rebuild();renderWords();renderTimeline();updatePreview(true)};$("resetWords").onclick=()=>{words=structuredClone(originalWords);finishCaptions();toast('Words reset')};
+function applySettings(){settings.font=$("font").value;settings.size=Number($("fontSize").value);settings.text=$("textColor").value;settings.highlight=$("highlightColor").value;settings.stroke=Number($("stroke").value);settings.glow=Number($("glow").value);settings.position=$("position").value;settings.case=$("case").value;$("sizeOut").textContent=settings.size+' px';$("strokeOut").textContent=settings.stroke;$("glowOut").textContent=settings.glow;updatePreview(true)}
+['font','fontSize','textColor','highlightColor','stroke','glow','position','case'].forEach(id=>$(id).addEventListener('input',applySettings));$("ratio").onchange=()=>{const v=$("ratio").value;previewWrap.className='previewWrap '+(v==='9:16'?'r916':v==='1:1'?'r11':'');setTimeout(()=>updatePreview(true),30)};
+document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));b.classList.add('active');preset=b.dataset.preset;updatePreview(true)});
+function pickMime(){return ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||null}
+function drawCaption(ctx,W,H,g,t){
+  if(!g?.words?.length||W<2||H<2)return;
+  const base=Math.min(W,H),scale=base/600;
+  const fs=Math.max(14,Math.min(settings.size*scale,base*.095));
+  const lineH=Math.max(fs*1.18,fs+Math.max(5,fs*.22));
+  const font=settings.font==='Georgia'?'Georgia':`'${settings.font.replace(/'/g,'')}','Noto Sans Gurmukhi','Noto Sans Devanagari',system-ui,sans-serif`;
+  ctx.save();ctx.font=`700 ${fs}px ${font}`;ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.direction='ltr';ctx.lineJoin='round';ctx.lineCap='round';
+  const space=Math.max(5,ctx.measureText(' ').width),maxW=Math.max(100,W*.88),lines=[[]];let lineW=0;
+  for(const word of g.words){const txt=textCase(String(word.word||'').normalize('NFC')).trim();if(!txt)continue;const ww=ctx.measureText(txt).width;const next=lineW?lineW+space+ww:ww;if(lineW&&next>maxW){lines.push([]);lineW=ww}else lineW=next;lines[lines.length-1].push({w:word,txt,ww})}
+  if(!lines[0].length){ctx.restore();return}
+  const ascent=ctx.actualBoundingBoxAscent||fs*.78,descent=ctx.actualBoundingBoxDescent||fs*.22;
+  const blockH=Math.max(lineH,lines.length*lineH),margin=Math.max(12,base*.04);
+  let top=settings.position==='top'?H*.12:settings.position==='mid'?(H-blockH)/2:H*.88-blockH;
+  top=Math.max(margin,Math.min(top,H-blockH-margin));
+  lines.forEach((line,li)=>{
+    const total=line.reduce((sum,item)=>sum+item.ww,0)+space*Math.max(0,line.length-1);let x=Math.max(margin,(W-total)/2);const baseline=top+li*lineH+ascent;
+    for(const item of line){
+      const on=isActive(item.w,t);const stroke=Math.max(1,settings.stroke*scale);ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.strokeStyle='#000';ctx.lineWidth=stroke;
+      if(preset==='pop'&&on){const px=Math.max(4,fs*.16),py=Math.max(3,fs*.10);ctx.fillStyle=settings.highlight;ctx.fillRect(x-px,baseline-ascent-py,item.ww+px*2,ascent+descent+py*2);ctx.fillStyle='#08090a'}
+      if(on&&preset==='neon'){ctx.shadowColor=settings.highlight;ctx.shadowBlur=Math.max(4,settings.glow*scale)}
+      ctx.strokeText(item.txt,x,baseline);if(!(preset==='pop'&&on))ctx.fillStyle=on?settings.highlight:settings.text;ctx.fillText(item.txt,x,baseline);x+=item.ww+space;
+    }
+  });ctx.restore();
+}
+exportVideo.onclick=async()=>{
+  if(!words.length||!currentFile||exporting)return;exporting=true;clearError();exportVideo.disabled=generate.disabled=true;$("downloadBox").classList.add('hidden');
+  let audioCtx=null,rv=null,stream=null,rec=null;
+  try{
+    const mime=pickMime();
+    if(!mime)throw new Error('This browser cannot record video in a supported MP4/WebM format. Try the latest Chrome or Edge.');
+    setProgress(2,'Preparing export renderer…');rv=document.createElement('video');rv.src=videoURL;rv.playsInline=true;rv.preload='auto';rv.muted=false;
+    await new Promise((res,rej)=>{rv.onloadedmetadata=res;rv.onerror=()=>rej(new Error('Could not load the video for export.'))});
+    const W=rv.videoWidth||1280,H=rv.videoHeight||720,sc=Math.min(1,1920/Math.max(W,H));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(2,Math.round(W*sc/2)*2);canvas.height=Math.max(2,Math.round(H*sc/2)*2);
+    const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('Canvas rendering is not supported by this browser.');
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();const dest=audioCtx.createMediaStreamDestination();const source=audioCtx.createMediaElementSource(rv);source.connect(dest);
+    const exportFps=Math.min(60,Math.max(24,Number(rv.dataset.fps)||30));const videoStream=canvas.captureStream(exportFps);stream=new MediaStream([...videoStream.getVideoTracks(),...dest.stream.getAudioTracks()]);
+    try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:7000000})}catch(firstErr){const fallback=['video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));if(!fallback)throw firstErr;rec=new MediaRecorder(stream,{mimeType:fallback,videoBitsPerSecond:6000000});setProgress(3,'MP4 unavailable here — using WebM export…')}
+    const actualMime=rec.mimeType||mime,chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+    const stopped=new Promise((resolve,reject)=>{rec.onstop=resolve;rec.onerror=e=>reject(e.error||new Error('MediaRecorder failed.'))});rv.onended=()=>{if(rec&&rec.state!=='inactive')rec.stop()};
+    const drawFrame=()=>{if(!rec||rec.state==='inactive')return;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(rv,0,0,canvas.width,canvas.height);const g=groupAt(rv.currentTime);if(g)drawCaption(ctx,canvas.width,canvas.height,g,rv.currentTime);setProgress(rv.duration?(rv.currentTime/rv.duration)*100:0,'Rendering… keep this tab open');if(rv.requestVideoFrameCallback)rv.requestVideoFrameCallback(drawFrame);else requestAnimationFrame(drawFrame)};
+    rv.currentTime=0;rec.start(250);await rv.play();drawFrame();await stopped;
+    const type=actualMime.split(';')[0].toLowerCase(),ext=type==='video/mp4'?'mp4':'webm',url=URL.createObjectURL(new Blob(chunks,{type}));const a=$("downloadLink");a.href=url;a.download='capin_'+currentFile.name.replace(/\.[^/.]+$/,'')+'.'+ext;a.textContent='Download .'+ext;$("formatNote").textContent=ext==='webm'?'This browser recorded WebM. Use a converter if your platform requires MP4.':'MP4 export ready.';$("downloadBox").classList.remove('hidden');setProgress(100,'Export finished — your captioned video is ready.');toast('Export complete');
+  }catch(e){error('Export error: '+(e&&e.message?e.message:e));setProgress(0,'Export failed.');if(rec&&rec.state!=='inactive')try{rec.stop()}catch(_){} }
+  finally{try{rv?.pause()}catch(_){}try{stream?.getTracks().forEach(t=>t.stop())}catch(_){}try{await audioCtx?.close()}catch(_){}exportVideo.disabled=generate.disabled=false;exporting=false}
+};
+window.addEventListener('beforeunload',()=>{if(videoURL)URL.revokeObjectURL(videoURL);cancelAnimationFrame(raf)});
+</script><!-- === CAPIN CYBERPUNK SPLASH LOADER — ISOLATED ADDITION === --><script>(()=>{window.addEventListener('DOMContentLoaded',()=>{const status=document.getElementById('appLoaderStatus');const messages=['INITIALIZING CAPIN CORE...','LOADING ENGINE...','READY'];let index=0;const cycle=setInterval(()=>{index=Math.min(index+1,messages.length-1);if(status)status.textContent=messages[index];if(index===messages.length-1)clearInterval(cycle)},500);setTimeout(()=>{const loader=document.getElementById('appLoader');if(loader){loader.style.opacity='0';loader.style.visibility='hidden';setTimeout(()=>loader.remove(),600)}},1500)})})();</script><!-- === END ISOLATED LOADER JS === --><style>#authGate{position:fixed;inset:0;z-index:90000;display:grid;place-items:center;background:#07070a;padding:20px}#authGate:not(.show){display:none}.agBox{width:100%;max-width:380px;background:#0d0d12;border:1px solid #25252e;border-radius:20px;padding:24px;color:#f7f7f9;font-family:'DM Sans',sans-serif}.agBox h2{font-family:'Space Grotesk';margin:0 0 6px;font-size:26px}.agBox p{color:#9b9ba7;font-size:13px;margin:0 0 16px}.agBox input{width:100%;padding:12px;margin-bottom:10px;border-radius:12px;border:1px solid #25252e;background:#121218;color:#fff}.agBox button{width:100%;padding:12px;border-radius:12px;font-weight:700;border:1px solid #25252e;background:#111116;color:#fff;margin-bottom:8px;cursor:pointer}.agBox .p{background:#f5ff3d;color:#09090a;border-color:#f5ff3d}#agMsg{color:#ff667d;font-size:12px;min-height:16px;margin:0 0 8px}#agReset{font-size:12px;color:#55e9ff;text-align:center;cursor:pointer}#agBar{position:fixed;left:10px;bottom:10px;z-index:89000;display:none;gap:8px;align-items:center;background:#0d0d12cc;border:1px solid #25252e;border-radius:12px;padding:6px 10px;font-size:11px;color:#9b9ba7;backdrop-filter:blur(8px)}#agBar button,#agBar a{background:none;border:0;color:#55e9ff;font-size:11px;cursor:pointer}</style>
+<div id="authGate" class="show"><div class="agBox"><h2>CAPIN</h2><p id="agState">Checking…</p><div id="agForm" style="display:none"><button id="agGoogle" class="p">Continue with Google</button><input id="agEmail" type="email" placeholder="Email"><input id="agPass" type="password" placeholder="Password (min 6)"><button id="agLogin">Login</button><button id="agSignup">Create account</button><div id="agReset">Forgot password?</div></div><div id="agMsg"></div><button id="agOut" style="display:none">Logout</button></div></div>
+<style>#admPanel{position:fixed;inset:0;z-index:89500;background:#07070a;color:#f7f7f9;overflow:auto;padding:16px;display:none;font:14px 'DM Sans',system-ui,sans-serif}#admPanel.show{display:block}#admPanel input,#admPanel select,#admPanel button{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid #25252e;background:#121218;color:#fff;cursor:pointer}#admPanel .card{background:#0d0d12;border:1px solid #25252e;border-radius:14px;padding:12px;margin:10px 0}#admPanel .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}#admPanel .b{color:#ff667d}#admPanel .ok{color:#55f09a}#admPanel small{color:#9b9ba7}</style>
+<div id="admPanel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">CAPIN Admin</b><button id="admClose">Close</button></div><p id="admInfo"></p><input id="admQ" placeholder="Search email/name" style="width:100%;cursor:text"><div id="admList"></div></div>
+<div id="agBar"><span id="agMail"></span><button id="agAdmin" style="display:none">Admin</button><button id="agLogout">Logout</button></div>
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import{getAuth,onAuthStateChanged,signInWithPopup,GoogleAuthProvider,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import{getFirestore,doc,getDoc,setDoc,onSnapshot,serverTimestamp,getDocs,collection,updateDoc,limit,query}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const firebaseConfig={
+ apiKey:"AIzaSyC7_CaTK7FabAGL7CCXXNw33lc6PHb-bJ4",
+ authDomain:"capin-e1dc8.firebaseapp.com",
+ projectId:"capin-e1dc8",
+ appId:"1:176994863564:web:8a5454dd003c5f1aec3569"
+};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),$=i=>document.getElementById(i);
+const gate=$('authGate'),msg=$('agMsg');setTimeout(()=>{if($('agState').textContent==='Checking…')$('agState').textContent='Site ko https link par kholo aur Firebase config check karo'},8000);let unsub=null;
+const show=(t,f,o)=>{gate.classList.add('show');$('agState').textContent=t;$('agForm').style.display=f?'block':'none';$('agOut').style.display=o?'block':'none';$('agBar').style.display='none'};
+const err=e=>{msg.textContent=(e.code||e.message||'').replace('auth/','')};
+onAuthStateChanged(auth,async u=>{
+ if(unsub){unsub();unsub=null}
+ if(!u){show('Login karo ya account banao',true);return}
+ const ref=doc(db,'users',u.uid);
+ try{if(!(await getDoc(ref)).exists())await setDoc(ref,{email:u.email,name:u.displayName||'',role:'user',status:'active',plan:'free',freeAccess:false,createdAt:serverTimestamp()})}
+ catch(e){show('Error: '+e.message,false,true);return}
+ unsub=onSnapshot(ref,s=>{const d=s.data()||{};
+  if(d.status==='banned'){show('Aapka account ban hai.',false,true);return}
+  gate.classList.remove('show');window.CAPIN_USER={uid:u.uid,...d};
+  $('agMail').textContent=u.email;$('agAdmin').style.display=['admin','staff'].includes(d.role)?'inline':'none';$('agBar').style.display='flex'});
+});
+$('agGoogle').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(err);
+$('agLogin').onclick=()=>signInWithEmailAndPassword(auth,$('agEmail').value,$('agPass').value).catch(err);
+$('agSignup').onclick=()=>createUserWithEmailAndPassword(auth,$('agEmail').value,$('agPass').value).catch(err);
+$('agReset').onclick=()=>sendPasswordResetEmail(auth,$('agEmail').value).then(()=>msg.textContent='Reset mail bhej diya').catch(err);
+$('agOut').onclick=$('agLogout').onclick=()=>signOut(auth);
+const el=(t,txt,c)=>{const e=document.createElement(t);if(txt!=null)e.textContent=txt;if(c)e.className=c;return e};
+let users=[];
+$('agAdmin').onclick=async()=>{$('admPanel').classList.add('show');$('admInfo').textContent='Role: '+window.CAPIN_USER.role;
+ try{users=(await getDocs(query(collection(db,'users'),limit(500)))).docs.map(d=>({uid:d.id,...d.data()}));admRender()}catch(e){$('admInfo').textContent='Error: '+e.message}};
+$('admClose').onclick=()=>$('admPanel').classList.remove('show');
+$('admQ').oninput=()=>admRender();
+async function admSet(u,p){try{await updateDoc(doc(db,'users',u.uid),p);Object.assign(u,p);admRender()}catch(e){alert(e.message)}}
+function admRender(){
+ const me=window.CAPIN_USER,f=$('admQ').value.toLowerCase(),L=$('admList');L.replaceChildren();
+ users.filter(u=>((u.email||'')+(u.name||'')).toLowerCase().includes(f)).forEach(u=>{
+  const c=el('div',null,'card');c.append(el('b',u.email||u.uid),el('br'),el('small',u.name||''),el('br'),el('span','role: '+u.role+' | plan: '+u.plan+' | free access: '+(u.freeAccess?'yes':'no')+' | '),el('span',u.status,u.status==='banned'?'b':'ok'));
+  const r=el('div',null,'row');
+  if(u.uid!==me.uid){
+   const bb=el('button',u.status==='banned'?'Unban':'Ban');bb.onclick=()=>admSet(u,{status:u.status==='banned'?'active':'banned'});r.append(bb);
+   if(me.role==='admin'){
+    const fb=el('button',u.freeAccess?'Remove free access':'Give free access');fb.onclick=()=>admSet(u,{freeAccess:!u.freeAccess});
+    const pb=el('button',u.plan==='paid'?'Set plan: free':'Set plan: paid');pb.onclick=()=>admSet(u,{plan:u.plan==='paid'?'free':'paid'});
+    const rs=el('select');['user','staff','admin'].forEach(x=>{const o=el('option',x);o.value=x;o.selected=u.role===x;rs.append(o)});rs.onchange=()=>admSet(u,{role:rs.value});
+    r.append(fb,pb,rs)}}
+  c.append(r);L.append(c)})}
+
+</script>
+</body></html>
