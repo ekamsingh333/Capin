@@ -220,6 +220,40 @@ $("addWord").onclick=()=>{const t=video.currentTime||0;words.push({word:'new',st
 function applySettings(){settings.font=$("font").value;settings.size=Number($("fontSize").value);settings.text=$("textColor").value;settings.highlight=$("highlightColor").value;settings.stroke=Number($("stroke").value);settings.glow=Number($("glow").value);settings.position=$("position").value;settings.case=$("case").value;$("sizeOut").textContent=settings.size+' px';$("strokeOut").textContent=settings.stroke;$("glowOut").textContent=settings.glow;updatePreview(true)}
 ['font','fontSize','textColor','highlightColor','stroke','glow','position','case'].forEach(id=>$(id).addEventListener('input',applySettings));$("ratio").onchange=()=>{const v=$("ratio").value;previewWrap.className='previewWrap '+(v==='9:16'?'r916':v==='1:1'?'r11':'');setTimeout(()=>updatePreview(true),30)};
 document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));b.classList.add('active');preset=b.dataset.preset;updatePreview(true)});
+function fixWebmDuration(buf,durSec){
+  const u=new Uint8Array(buf);
+  const vlen=b=>{let n=1,m=0x80;while(n<=8&&!(b&m)){n++;m>>=1}return n};
+  const rdSize=(p)=>{const n=vlen(u[p]);let v=u[p]&(0xFF>>n),unk=(v===(0xFF>>n));for(let i=1;i<n;i++){v=v*256+u[p+i];if(u[p+i]!==255)unk=false}return{n,v,unk}};
+  const rdId=p=>{const n=vlen(u[p]);let v=0;for(let i=0;i<n;i++)v=v*256+u[p+i];return{n,v}};
+  const enc8=v=>{const o=new Uint8Array(8);o[0]=1;for(let i=7;i>=1;i--){o[i]=v%256;v=Math.floor(v/256)}return o};
+  try{
+    let p=0;const e=rdId(p);if(e.v!==0x1A45DFA3)return buf;const es=rdSize(p+e.n);p+=e.n+es.n+es.v;
+    const seg=rdId(p);if(seg.v!==0x18538067)return buf;const segSize=rdSize(p+seg.n);const segSizePos=p+seg.n;let q=p+seg.n+segSize.n;
+    let infoPos=-1;
+    while(q<u.length){const id=rdId(q),sz=rdSize(q+id.n);if(id.v===0x1549A966){infoPos=q;break}if(id.v===0x1F43B675||sz.unk)return buf;q+=id.n+sz.n+sz.v}
+    if(infoPos<0)return buf;
+    const iid=rdId(infoPos),isz=rdSize(infoPos+iid.n),dataStart=infoPos+iid.n+isz.n,dataEnd=dataStart+isz.v;
+    let scale=1000000,durPos=-1,durLen=0,r=dataStart;
+    while(r<dataEnd){const id=rdId(r),sz=rdSize(r+id.n),ds=r+id.n+sz.n;
+      if(id.v===0x2AD7B1){let v=0;for(let i=0;i<sz.v;i++)v=v*256+u[ds+i];scale=v}
+      if(id.v===0x4489){durPos=ds;durLen=sz.v}
+      r=ds+sz.v}
+    const val=durSec*1e9/scale;
+    if(durPos>=0&&(durLen===4||durLen===8)){const c=new Uint8Array(u);const dv=new DataView(c.buffer);durLen===8?dv.setFloat64(durPos,val):dv.setFloat32(durPos,val);return c.buffer}
+    const add=new Uint8Array(11);add[0]=0x44;add[1]=0x89;add[2]=0x88;new DataView(add.buffer).setFloat64(3,val);
+    const newInfoSize=enc8(isz.v+11);
+    const delta=11+(8-isz.n);
+    const head=u.slice(0,infoPos+iid.n),body=u.slice(dataStart,dataEnd),tail=u.slice(dataEnd);
+    const out=new Uint8Array(head.length+8+body.length+11+tail.length);let o=0;
+    out.set(head,o);o+=head.length;out.set(newInfoSize,o);o+=8;out.set(body,o);o+=body.length;out.set(add,o);o+=11;out.set(tail,o);
+    if(!segSize.unk){let nv=segSize.v+delta;for(let i=segSize.n-1;i>=0;i--){out[segSizePos+i]=(i===0?(out[segSizePos]&~(0xFF>>segSize.n)&0xFF)|0:0);}
+      // rewrite with same length
+      let v2=nv;const bytes=[];for(let i=0;i<segSize.n;i++){bytes.unshift(v2%256);v2=Math.floor(v2/256)}
+      bytes[0]=(bytes[0]&(0xFF>>segSize.n))|(0x80>>(segSize.n-1));
+      for(let i=0;i<segSize.n;i++)out[segSizePos+i]=bytes[i]}
+    return out.buffer;
+  }catch(err){return buf}
+}
 function pickMime(){return ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||null}
 function drawCaption(ctx,W,H,g,t){
   if(!g?.words?.length||W<2||H<2)return;
@@ -263,7 +297,7 @@ exportVideo.onclick=async()=>{
     const stopped=new Promise((resolve,reject)=>{rec.onstop=resolve;rec.onerror=e=>reject(e.error||new Error('MediaRecorder failed.'))});rv.onended=()=>{if(rec&&rec.state!=='inactive')rec.stop()};
     const drawFrame=()=>{if(!rec||rec.state==='inactive')return;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(rv,0,0,canvas.width,canvas.height);const g=groupAt(rv.currentTime);if(g)drawCaption(ctx,canvas.width,canvas.height,g,rv.currentTime);setProgress(rv.duration?(rv.currentTime/rv.duration)*100:0,'Rendering… keep this tab open');if(rv.requestVideoFrameCallback)rv.requestVideoFrameCallback(drawFrame);else requestAnimationFrame(drawFrame)};
     rv.currentTime=0;rec.start(250);await rv.play();drawFrame();await stopped;
-    const type=actualMime.split(';')[0].toLowerCase(),ext=type==='video/mp4'?'mp4':'webm',url=URL.createObjectURL(new Blob(chunks,{type}));const a=$("downloadLink");a.href=url;a.download='capin_'+currentFile.name.replace(/\.[^/.]+$/,'')+'.'+ext;a.textContent='Download .'+ext;$("formatNote").textContent=ext==='webm'?'This browser recorded WebM. Use a converter if your platform requires MP4.':'MP4 export ready.';$("downloadBox").classList.remove('hidden');setProgress(100,'Export finished — your captioned video is ready.');toast('Export complete');
+    const type=actualMime.split(';')[0].toLowerCase(),ext=type==='video/mp4'?'mp4':'webm';let outBlob=new Blob(chunks,{type});if(ext==='webm'&&isFinite(rv.duration)&&rv.duration>0){try{outBlob=new Blob([fixWebmDuration(await outBlob.arrayBuffer(),rv.duration)],{type})}catch(_){}}const url=URL.createObjectURL(outBlob);const a=$("downloadLink");a.href=url;a.download='capin_'+currentFile.name.replace(/\.[^/.]+$/,'')+'.'+ext;a.textContent='Download .'+ext;$("formatNote").textContent=ext==='webm'?'This browser recorded WebM. Use a converter if your platform requires MP4.':'MP4 export ready.';$("downloadBox").classList.remove('hidden');setProgress(100,'Export finished — your captioned video is ready.');toast('Export complete');
   }catch(e){error('Export error: '+(e&&e.message?e.message:e));setProgress(0,'Export failed.');if(rec&&rec.state!=='inactive')try{rec.stop()}catch(_){} }
   finally{try{rv?.pause()}catch(_){}try{stream?.getTracks().forEach(t=>t.stop())}catch(_){}try{await audioCtx?.close()}catch(_){}exportVideo.disabled=generate.disabled=false;exporting=false}
 };
