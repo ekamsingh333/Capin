@@ -31,6 +31,62 @@
 @keyframes capinLoaderCounterRotate{to{transform:rotate(-360deg)}}
 /* === END ISOLATED LOADER CSS === */
 </style>
+<style id="premium">
+/* === CAPIN PREMIUM LAYER — smooth, glassy, butter motion === */
+:root{--ease:cubic-bezier(.22,1,.36,1);--glass:rgba(255,255,255,.035);--edge:rgba(255,255,255,.09)}
+html{scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#2a2a33 transparent}
+::selection{background:rgba(245,255,61,.85);color:#08080a}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#26262e;border-radius:9px}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden}
+body:before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(520px 520px at var(--mx,70%) var(--my,10%),rgba(245,255,61,.07),transparent 65%),radial-gradient(700px 500px at 10% 90%,rgba(85,233,255,.06),transparent 60%);transition:background .25s linear}
+body:after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
+#scrollBar{position:fixed;top:0;left:0;height:2px;width:100%;z-index:99998;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,var(--yellow),var(--cyan));box-shadow:0 0 12px rgba(245,255,61,.6)}
+/* nav */
+.topbar{transition:background .4s var(--ease),border-color .4s var(--ease),height .4s var(--ease)}
+.topbar.scrolled{height:62px;background:rgba(9,9,12,.72);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);border-bottom-color:var(--edge)}
+.nav a{position:relative;transition:color .3s var(--ease)}
+.nav a:after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:1px;background:var(--yellow);transform:scaleX(0);transition:transform .45s var(--ease)}
+.nav a:hover:after{transform:scaleX(1)}
+/* hero */
+.hero h1{background:linear-gradient(180deg,#fff,#b9b9c4 120%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 10px 40px rgba(245,255,61,.08))}
+.hero h1 .grad{background:linear-gradient(100deg,#fff 5%,var(--yellow) 45%,var(--cyan) 95%,#fff);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;animation:sheen 7s var(--ease) infinite alternate}
+@keyframes sheen{to{background-position:100% 0}}
+.eyebrow{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:var(--edge)}
+.dot{animation:pulse 2.2s ease-in-out infinite}@keyframes pulse{50%{transform:scale(1.5);opacity:.5}}
+.stat{transition:transform .5s var(--ease),border-color .4s,background .4s}.stat:hover{transform:translateY(-3px);border-color:rgba(245,255,61,.35);background:rgba(245,255,61,.05)}
+.heroVisual{perspective:1100px}
+.phone{transform:rotate(1.5deg) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .6s var(--ease),box-shadow .6s;animation:floaty 7s ease-in-out infinite;will-change:transform;box-shadow:0 40px 120px rgba(0,0,0,.55),0 0 90px rgba(245,255,61,.07)}
+@keyframes floaty{50%{translate:0 -12px}}
+.floatCard{animation:floaty 6s ease-in-out -2s infinite;border-color:var(--edge)}
+.fakeCaption b{display:inline-block;animation:popw 2.4s var(--ease) infinite}@keyframes popw{0%,100%{transform:scale(1)}45%{transform:scale(1.14)}}
+/* cards & glass */
+.card{background:linear-gradient(180deg,rgba(24,24,31,.72),rgba(11,11,15,.82));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-color:var(--edge);position:relative;transition:transform .6s var(--ease),border-color .5s,box-shadow .6s var(--ease)}
+.card:before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;opacity:0;transition:opacity .5s;background:radial-gradient(420px circle at var(--cx,50%) var(--cy,0%),rgba(245,255,61,.09),transparent 45%)}
+.card:hover:before{opacity:1}.card:hover{border-color:rgba(255,255,255,.16)}
+.cardHead{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent)}
+.upload{transition:transform .5s var(--ease),border-color .4s,background .4s,box-shadow .5s}
+.upload:hover{transform:translateY(-3px);border-color:rgba(245,255,61,.5);box-shadow:0 18px 50px rgba(245,255,61,.07)}
+.uploadIcon{animation:floaty 4s ease-in-out infinite}
+/* buttons */
+.btn{position:relative;overflow:hidden;transition:transform .35s var(--ease),box-shadow .4s var(--ease),filter .3s,background .3s,border-color .3s;-webkit-tap-highlight-color:transparent}
+.btn:hover:not(:disabled){transform:translateY(-2px)}.btn:active:not(:disabled){transform:translateY(0) scale(.97);transition-duration:.12s}
+.btn.primary:hover:not(:disabled){box-shadow:0 12px 34px rgba(245,255,61,.28)}.btn.cyan:hover:not(:disabled){box-shadow:0 12px 34px rgba(85,233,255,.28)}
+.btn:after{content:'';position:absolute;top:0;left:-70%;width:45%;height:100%;transform:skewX(-20deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transition:left .8s var(--ease);pointer-events:none}
+.btn:hover:not(:disabled):after{left:130%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.toolPill,.preset{transition:transform .3s var(--ease),border-color .3s,color .3s,background .3s}.toolPill:hover,.preset:hover{transform:translateY(-2px);color:#fff}
+input,select,textarea{transition:border-color .3s,box-shadow .4s var(--ease),background .3s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:rgba(245,255,61,.55)!important;box-shadow:0 0 0 4px rgba(245,255,61,.09)}
+.bar i,#progress{transition:width .6s var(--ease);background:linear-gradient(90deg,var(--yellow),var(--cyan))!important;box-shadow:0 0 14px rgba(245,255,61,.4)}
+.wordRow,.clip{transition:background .25s,transform .3s var(--ease)}
+.download{animation:rise .7s var(--ease)}@keyframes rise{from{opacity:0;transform:translateY(16px) scale(.97)}}
+.toast{transition:opacity .5s var(--ease),transform .5s var(--ease);backdrop-filter:blur(16px)}
+/* scroll reveal */
+.rv{opacity:0;transform:translate3d(0,34px,0) scale(.985);filter:blur(6px);transition:opacity .9s var(--ease),transform .9s var(--ease),filter .9s var(--ease);transition-delay:var(--d,0s);will-change:transform,opacity}
+.rv.in{opacity:1;transform:none;filter:none}
+@media(max-width:1000px){.phone{animation:none}.card{backdrop-filter:none;-webkit-backdrop-filter:none}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition-duration:.01s!important}.rv{opacity:1;transform:none;filter:none}html{scroll-behavior:auto}}
+</style>
 </head>
 <body>
 <!-- === CAPIN CYBERPUNK SPLASH LOADER — ISOLATED ADDITION === --><div id="appLoader" aria-label="Loading CAPIN"><div class="loaderCore"><div class="loaderGlow"></div><h2 class="loaderTitle">CAPIN</h2><svg class="loaderRing" viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="39"></circle><circle class="cyanArc" cx="50" cy="50" r="39"></circle><circle class="yellowArc" cx="50" cy="50" r="39"></circle></svg><p class="loaderStatus" id="appLoaderStatus">INITIALIZING CAPIN CORE...</p></div></div><!-- === END ISOLATED LOADER HTML === -->
@@ -40,7 +96,7 @@
 <section class="workspace" id="studio">
 <div>
 <div class="card"><div class="cardHead"><div><h2>01 — Create captions</h2><span class="sub">Your video stays in this browser tab.</span></div><span class="eyebrow">Local AI</span></div><div class="cardBody">
-<div class="upload" id="drop"><div class="uploadIcon">↑</div><strong>Drop your video here</strong><small>MP4, MOV, WebM and common browser formats</small><label class="btn primary" id="choose" for="videoInput">Choose video</label><input id="videoInput" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv,.avi,.3gp,.mpeg,.mpg,.ogv" aria-label="Choose video file" style="position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none"><div class="tiny">For best performance, use a short-form clip under 5 minutes.</div></div>
+<div class="upload" id="drop"><div class="uploadIcon">↑</div><strong>Drop your video here</strong><small>MP4, MOV, WebM and common browser formats</small><label class="btn primary" id="choose" for="videoInput">Choose video</label> <label class="btn" id="chooseFiles" for="videoInputFiles" style="margin-left:6px">Pick from Files (faster)</label><input id="videoInputFiles" type="file" aria-label="Pick video from Files" style="position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none"><input id="videoInput" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv,.avi,.3gp,.mpeg,.mpg,.ogv" aria-label="Choose video file" style="position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none"><div class="tiny">For best performance, use a short-form clip under 5 minutes.<br>Tip: use “Pick from Files (faster)” — it skips Google Photos’ “Preparing media” wait. Videos still in Photos cloud must be downloaded to your phone first.</div></div>
 <div class="controls">
 <div class="two"><div class="field"><label>Language</label><select id="language"><option value="auto">Auto detect</option><option value="english">English</option><option value="hindi">Hindi</option><option value="punjabi">Punjabi</option><option value="spanish">Spanish</option><option value="french">French</option><option value="german">German</option><option value="japanese">Japanese</option><option value="korean">Korean</option><option value="portuguese">Portuguese</option><option value="arabic">Arabic</option><option value="bengali">Bengali</option><option value="urdu">Urdu</option><option value="russian">Russian</option><option value="chinese">Chinese</option></select></div><div class="field"><label>Whisper model</label><select id="model"><option value="Xenova/whisper-base" selected>Base — balanced</option><option value="Xenova/whisper-small">Small — better multilingual</option><option value="onnx-community/whisper-large-v3-turbo">Large-v3 Turbo — WebGPU</option><option value="Xenova/whisper-tiny">Tiny — fastest</option></select></div></div>
 <div class="two"><div class="field"><label>Aspect ratio</label><select id="ratio"><option value="16:9">16:9 YouTube</option><option value="9:16">9:16 Reels / Shorts</option><option value="1:1">1:1 Square</option></select></div><div class="field"><label>Position</label><select id="position"><option value="bottom">Bottom</option><option value="mid">Middle</option><option value="top">Top</option></select></div></div>
@@ -82,7 +138,7 @@ function loadVideoToCanvas(url,sourceFile){return new Promise((resolve,reject)=>
 function readFileFallback(file){return new Promise((resolve,reject)=>{setProgress(1,'Reading video through Android file fallback…');const reader=new FileReader();reader.onload=async evt=>{try{const blob=new Blob([evt.target.result],{type:file.type||'video/mp4'});const u=URL.createObjectURL(blob);await loadVideoToCanvas(u,blob);resolve(blob)}catch(e){reject(e)}};reader.onerror=()=>reject(reader.error||new Error('Android FileReader could not read this video.'));reader.onabort=()=>reject(new Error('Video file read was cancelled.'));reader.readAsArrayBuffer(file)})}
 async function setFile(f){if(!f)return;if(!isVideoFile(f)){error('Please choose a video file such as MP4, MOV, WebM or MKV.');return}clearError();try{const u=URL.createObjectURL(f);try{await loadVideoToCanvas(u,f)}catch(firstError){try{if(u)URL.revokeObjectURL(u)}catch(_){}await readFileFallback(f)}}catch(e){error('Android could not open this video. If it is only in Google Photos/cloud storage, first download it to Device Storage/Files and select it there.');setProgress(0,'Choose a locally downloaded video from Files.');toast('Could not open video')}}
 drop.addEventListener("click",e=>{
-  if(e.target.closest && e.target.closest("#choose")) return;
+  if(e.target.closest && e.target.closest("#choose,#chooseFiles,input")) return;
   try{fileEl.click();}catch(_){}
 });
 fileEl.addEventListener("change",e=>{
@@ -93,20 +149,21 @@ fileEl.addEventListener("input",e=>{
   const f=e.currentTarget.files && e.currentTarget.files[0];
   if(f) setFile(f);
 });
+$("videoInputFiles").addEventListener("change",e=>{const f=e.currentTarget.files&&e.currentTarget.files[0];if(f)setFile(f)});
 drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};
 drop.ondragleave=()=>drop.classList.remove('drag');
 drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');setFile(e.dataTransfer?.files?.[0])};
 $("jumpUpload").onclick=()=>drop.scrollIntoView({behavior:'smooth',block:'center'});$("demoBtn").onclick=()=>{toast('Upload a video to activate the live editor')};
 function languageCode(value){const map={auto:null,english:'en',hindi:'hi',punjabi:'pa',spanish:'es',french:'fr',german:'de',japanese:'ja',korean:'ko',portuguese:'pt',arabic:'ar',bengali:'bn',urdu:'ur',russian:'ru',chinese:'zh'};return (map[value]??value)||null}
-function chooseAutoModel(){const ram=Number(navigator.deviceMemory||4),cores=Number(navigator.hardwareConcurrency||4);if(navigator.gpu&&ram>=8&&cores>=8)return 'onnx-community/whisper-large-v3-turbo';if(ram>=6&&cores>=6)return 'Xenova/whisper-base';return 'Xenova/whisper-tiny'}
+function chooseAutoModel(){const ram=Number(navigator.deviceMemory||4),cores=Number(navigator.hardwareConcurrency||4);const phone=/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);if(!phone&&navigator.gpu&&ram>=8&&cores>=8)return 'onnx-community/whisper-large-v3-turbo';if(ram>=6&&cores>=6)return 'Xenova/whisper-base';return 'Xenova/whisper-tiny'}
 function saferModel(model){if(model.includes('turbo'))return 'Xenova/whisper-base';if(model==='Xenova/whisper-small')return 'Xenova/whisper-base';if(model==='Xenova/whisper-base')return 'Xenova/whisper-tiny';return 'Xenova/whisper-tiny'}
-function resolveModel(requested){if(requested==='auto'||!requested)return chooseAutoModel();if(requested.includes('turbo')&&!navigator.gpu)return 'Xenova/whisper-base';return requested}
+function resolveModel(requested){if(requested==='auto'||!requested)return chooseAutoModel();if(requested.includes('turbo')&&(!navigator.gpu||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)))return 'Xenova/whisper-base';return requested}
 async function getTranscriber(model){if(transcriber&&loadedModel===model)return transcriber;if(transcriber&&loadedModel!==model){try{await transcriber.dispose?.()}catch(_){}transcriber=null;loadedModel=null}setProgress(5,'Loading Whisper model… first use downloads model files.');const cb=p=>{if(p.status==='progress')setProgress(5+(p.progress||0)*.3,'Downloading model… '+Math.round(p.progress||0)+'%')};if(model.includes('turbo')){if(!navigator.gpu)throw new Error('WebGPU is unavailable for this model.');transcriber=await pipeline('automatic-speech-recognition',model,{device:'webgpu',dtype:{encoder_model:'fp16',decoder_model_merged:'q4'},progress_callback:cb})}else transcriber=await pipeline('automatic-speech-recognition',model,{device:'wasm',dtype:'q8',progress_callback:cb});loadedModel=model;return transcriber}
 async function audioFromVideo(file){setProgress(3,'Extracting audio…');const bytes=await file.arrayBuffer();const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error('Web Audio is not supported in this browser.');const ctx=new AC({sampleRate:TARGET_SR});try{const audioBuffer=await ctx.decodeAudioData(bytes.slice(0));const duration=audioBuffer.duration||audioBuffer.length/audioBuffer.sampleRate;setProgress(34,'Audio ready — starting AI transcription…');return{buffer:audioBuffer,duration,sampleRate:audioBuffer.sampleRate}}catch(e){throw new Error('Could not decode audio from this video: '+(e.message||e))}finally{try{await ctx.close()}catch(_){}}}
 function makeAudioChunk(source,startSec,endSec,sampleRate){const sr=source.sampleRate||sampleRate||TARGET_SR,start=Math.max(0,Math.floor(startSec*sr)),end=Math.min(source.length,Math.ceil(endSec*sr)),frames=Math.max(0,end-start),channels=source.numberOfChannels||1;if(!frames)return new Float32Array(0);const data=Array.from({length:channels},(_,c)=>source.getChannelData(c));if(sr===TARGET_SR){const out=new Float32Array(frames);for(let i=0;i<frames;i++){let v=0;for(let c=0;c<channels;c++)v+=data[c][start+i]||0;out[i]=v/channels}return out}const outLen=Math.max(1,Math.round(frames*TARGET_SR/sr)),out=new Float32Array(outLen),ratio=sr/TARGET_SR;for(let i=0;i<outLen;i++){const pos=i*ratio,index=Math.floor(pos),frac=pos-index;let a=0,b=0;for(let c=0;c<channels;c++){a+=data[c][start+index]||0;b+=data[c][Math.min(end-1,start+index+1)]||0}a/=channels;b/=channels;out[i]=a+(b-a)*frac}return out}
 const WORKER_CDN='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';let whisperWorker=null,whisperWorkerURL=null,workerSeq=0;let smoothRAF=0,smoothValue=0,smoothTarget=0;
 function smoothProgress(target,msg){smoothTarget=Math.max(0,Math.min(100,target));if(msg)statusText.textContent=msg;if(smoothRAF)return;const step=()=>{smoothValue+=(smoothTarget-smoothValue)*.16;if(Math.abs(smoothTarget-smoothValue)<.15)smoothValue=smoothTarget;progress.style.width=smoothValue+'%';statusPct.textContent=Math.round(smoothValue)+'%';if(Math.abs(smoothTarget-smoothValue)>.15)smoothRAF=requestAnimationFrame(step);else smoothRAF=0};smoothRAF=requestAnimationFrame(step)}
-function createWhisperWorker(){if(whisperWorker)return whisperWorker;const source=`import{pipeline,env}from'${WORKER_CDN}';env.allowLocalModels=false;env.useBrowserCache=true;let pipe=null,modelName='';const send=(id,type,payload={})=>self.postMessage({id,type,...payload});self.onmessage=async e=>{const{id,type,model,chunk,language}=e.data;try{if(type==='load'){if(!pipe||modelName!==model){const cb=p=>{if(p.status==='progress')send(id,'load-progress',{progress:p.progress||0})};const isTurbo=model.includes('turbo');pipe=await pipeline('automatic-speech-recognition',model,{device:isTurbo?'webgpu':'wasm',dtype:isTurbo?{encoder_model:'fp16',decoder_model_merged:'q4'}:'q8',progress_callback:cb});modelName=model}send(id,'loaded',{model:modelName});return}if(type==='transcribe'){if(!pipe||modelName!==model)throw new Error('Whisper model is not loaded.');const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:30,stride_length_s:2,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};if(language)opts.language=language;const heartbeat=setInterval(()=>send(id,'heartbeat'),900);let result=null;try{result=await pipe(chunk,opts)}finally{clearInterval(heartbeat)}send(id,'result',{result});result=null}}catch(err){send(id,'error',{message:String(err?.message||err)})}};`;const blob=new Blob([source],{type:'application/javascript'});whisperWorkerURL=URL.createObjectURL(blob);try{whisperWorker=new Worker(whisperWorkerURL,{type:'module',name:'CAPIN-Whisper'});return whisperWorker}catch(e){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null;whisperWorker=null;throw e}}
+function createWhisperWorker(){if(whisperWorker)return whisperWorker;const source=`import{pipeline,env}from'${WORKER_CDN}';env.allowLocalModels=false;env.useBrowserCache=true;let pipe=null,modelName='',dev='wasm';const send=(id,type,payload={})=>self.postMessage({id,type,...payload});self.onmessage=async e=>{const{id,type,model,chunk,language}=e.data;try{if(type==='load'){if(!pipe||modelName!==model){const cb=p=>{if(p.status==='progress')send(id,'load-progress',{progress:p.progress||0})};const isTurbo=model.includes('turbo'),canGpu=!!(self.navigator&&self.navigator.gpu);const build=d=>pipeline('automatic-speech-recognition',model,{device:d,dtype:d==='webgpu'?(isTurbo?{encoder_model:'fp16',decoder_model_merged:'q4'}:'fp32'):'q8',progress_callback:cb});try{pipe=await build(canGpu?'webgpu':'wasm');dev=canGpu?'webgpu':'wasm'}catch(e0){if(isTurbo)throw e0;pipe=await build('wasm');dev='wasm'}modelName=model}send(id,'loaded',{model:modelName});return}if(type==='transcribe'){if(!pipe||modelName!==model)throw new Error('Whisper model is not loaded.');const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:30,stride_length_s:2,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};if(language)opts.language=language;const heartbeat=setInterval(()=>send(id,'heartbeat'),900);let result=null;try{try{result=await pipe(chunk,opts)}catch(eg){if(dev!=='webgpu'||model.includes('turbo'))throw eg;pipe=await pipeline('automatic-speech-recognition',model,{device:'wasm',dtype:'q8'});dev='wasm';result=await pipe(chunk,opts)}}finally{clearInterval(heartbeat)}send(id,'result',{result});result=null}}catch(err){send(id,'error',{message:String(err?.message||err)})}};`;const blob=new Blob([source],{type:'application/javascript'});whisperWorkerURL=URL.createObjectURL(blob);try{whisperWorker=new Worker(whisperWorkerURL,{type:'module',name:'CAPIN-Whisper'});return whisperWorker}catch(e){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null;whisperWorker=null;throw e}}
 function destroyWhisperWorker(){if(whisperWorker){try{whisperWorker.terminate()}catch(_){}whisperWorker=null}if(whisperWorkerURL){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null}}
 function workerRequest(type,payload,timeoutMs=180000){const w=createWhisperWorker(),id=++workerSeq;return new Promise((resolve,reject)=>{let done=false;const timer=setTimeout(()=>finish(new Error('TIMEOUT:AI chunk exceeded the safety timeout')),timeoutMs);const handler=e=>{const m=e.data||{};if(m.id!==id)return;if(m.type==='heartbeat'){return}if(m.type==='load-progress'){smoothProgress(8+(m.progress||0)*30,'Loading Whisper model… '+Math.round(m.progress||0)+'%');return}if(m.type==='loaded')finish(null,m);else if(m.type==='result')finish(null,m.result);else if(m.type==='error')finish(new Error(m.message||'Whisper worker error'))};const finish=(err,val)=>{if(done)return;done=true;clearTimeout(timer);w.removeEventListener('message',handler);err?reject(err):resolve(val)};w.addEventListener('message',handler);try{if(payload.chunk)w.postMessage({id,type,...payload},[payload.chunk.buffer]);else w.postMessage({id,type,...payload})}catch(e){finish(e)}})}
 const graphemeSegmenter=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;function graphemeLength(s){return graphemeSegmenter?[...graphemeSegmenter.segment(s)].length:Array.from(s||'').length}function splitWords(s){return String(s||'').normalize('NFC').trim().split(/\s+/u).filter(Boolean)}
@@ -256,5 +313,25 @@ function admRender(){
     r.append(fb,pb,rs)}}
   c.append(r);L.append(c)})}
 
+</script>
+<script>
+/* === CAPIN PREMIUM MOTION === */
+(()=>{const d=document,rm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const bar=d.createElement('div');bar.id='scrollBar';d.body.appendChild(bar);
+const top=d.querySelector('.topbar');let tk=false;
+const onScroll=()=>{if(tk)return;tk=true;requestAnimationFrame(()=>{const y=scrollY,h=d.documentElement.scrollHeight-innerHeight;bar.style.transform='scaleX('+(h>0?y/h:0)+')';top&&top.classList.toggle('scrolled',y>12);tk=false})};
+addEventListener('scroll',onScroll,{passive:true});onScroll();
+if(!rm){
+const sel='.eyebrow,.hero h1,.hero>div>p,.heroStats,.heroVisual,.workspace .card,.editorCard,#export,.footer';
+d.querySelectorAll(sel).forEach((el,i)=>{el.classList.add('rv');el.style.setProperty('--d',((i%4)*.09)+'s')});
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.08,rootMargin:'0px 0px -6% 0px'});
+d.querySelectorAll('.rv').forEach(el=>io.observe(el));
+setTimeout(()=>d.querySelectorAll('.rv:not(.in)').forEach(el=>{const r=el.getBoundingClientRect();if(r.top<innerHeight)el.classList.add('in')}),2200);
+let raf=0;addEventListener('pointermove',e=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;d.body.style.setProperty('--mx',e.clientX+'px');d.body.style.setProperty('--my',e.clientY+'px')})},{passive:true});
+d.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.closest('.card');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--cx',(e.clientX-r.left)+'px');c.style.setProperty('--cy',(e.clientY-r.top)+'px')}},{passive:true});
+const hv=d.querySelector('.heroVisual'),ph=d.querySelector('.phone');
+if(hv&&ph&&matchMedia('(hover:hover)').matches){hv.addEventListener('pointermove',e=>{const r=hv.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;ph.style.setProperty('--ry',(x*10)+'deg');ph.style.setProperty('--rx',(-y*10)+'deg')});hv.addEventListener('pointerleave',()=>{ph.style.setProperty('--ry','0deg');ph.style.setProperty('--rx','0deg')})}
+}
+})();
 </script>
 </body></html>
