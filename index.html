@@ -42,7 +42,7 @@
 <div class="card"><div class="cardHead"><div><h2>01 — Create captions</h2><span class="sub">Your video stays in this browser tab.</span></div><span class="eyebrow">Local AI</span></div><div class="cardBody">
 <div class="upload" id="drop"><div class="uploadIcon">↑</div><strong>Drop your video here</strong><small>MP4, MOV, WebM and common browser formats</small><button class="btn primary" id="choose">Choose video</button><input id="videoInput" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,*/*" style="display:none"><div class="tiny">For best performance, use a short-form clip under 5 minutes.</div></div>
 <div class="controls">
-<div class="two"><div class="field"><label>Language</label><select id="language"><option value="auto">Auto detect</option><option value="english">English</option><option value="hindi">Hindi</option><option value="punjabi">Punjabi</option><option value="spanish">Spanish</option><option value="french">French</option><option value="german">German</option><option value="japanese">Japanese</option><option value="korean">Korean</option><option value="portuguese">Portuguese</option><option value="arabic">Arabic</option><option value="bengali">Bengali</option><option value="urdu">Urdu</option><option value="russian">Russian</option><option value="chinese">Chinese</option></select></div><div class="field"><label>Whisper model</label><select id="model"><option value="auto" selected>Auto — mobile-safe</option><option value="Xenova/whisper-tiny">Tiny — q8 fastest</option><option value="Xenova/whisper-base">Base — q8 balanced</option><option value="Xenova/whisper-small">Small — heavier</option><option value="onnx-community/whisper-large-v3-turbo">Large-v3 Turbo — WebGPU</option></select></div></div>
+<div class="two"><div class="field"><label>Language</label><select id="language"><option value="auto">Auto detect</option><option value="english">English</option><option value="hindi">Hindi</option><option value="punjabi">Punjabi</option><option value="spanish">Spanish</option><option value="french">French</option><option value="german">German</option><option value="japanese">Japanese</option><option value="korean">Korean</option><option value="portuguese">Portuguese</option><option value="arabic">Arabic</option><option value="bengali">Bengali</option><option value="urdu">Urdu</option><option value="russian">Russian</option><option value="chinese">Chinese</option></select></div><div class="field"><label>Whisper model</label><select id="model"><option value="Xenova/whisper-base" selected>Base — balanced</option><option value="Xenova/whisper-small">Small — better multilingual</option><option value="onnx-community/whisper-large-v3-turbo">Large-v3 Turbo — WebGPU</option><option value="Xenova/whisper-tiny">Tiny — fastest</option></select></div></div>
 <div class="two"><div class="field"><label>Aspect ratio</label><select id="ratio"><option value="16:9">16:9 YouTube</option><option value="9:16">9:16 Reels / Shorts</option><option value="1:1">1:1 Square</option></select></div><div class="field"><label>Position</label><select id="position"><option value="bottom">Bottom</option><option value="mid">Middle</option><option value="top">Top</option></select></div></div>
 <div class="field" id="styles"><label>Caption style</label><div class="presetGrid"><button class="preset active" data-preset="hormozi" style="--p:#f5ff3d"><b>Hormozi</b><span>Yellow active word</span></button><button class="preset" data-preset="neon" style="--p:#55e9ff"><b>Cyber Neon</b><span>Cyan glow</span></button><button class="preset" data-preset="clean" style="--p:#fff"><b>Clean</b><span>Minimal subtitles</span></button><button class="preset" data-preset="pop" style="--p:#ff6bff"><b>Bold Pop</b><span>Active word card</span></button><button class="preset" data-preset="karaoke" style="--p:#ffd21c"><b>Karaoke</b><span>Word-by-word highlight</span></button></div></div>
 <div class="two"><div class="field"><label>Font <span id="fontLabel">Space Grotesk</span></label><select id="font"><option value="Space Grotesk">Space Grotesk</option><option value="DM Sans">DM Sans</option><option value="Arial">Arial</option><option value="Georgia">Georgia</option></select></div><div class="field"><label>Text case</label><select id="case"><option value="upper">UPPERCASE</option><option value="normal">Normal</option><option value="lower">lowercase</option></select></div></div>
@@ -82,273 +82,45 @@ function loadVideoToCanvas(url,sourceFile){return new Promise((resolve,reject)=>
 function readFileFallback(file){return new Promise((resolve,reject)=>{setProgress(1,'Reading video through Android file fallback…');const reader=new FileReader();reader.onload=async evt=>{try{const blob=new Blob([evt.target.result],{type:file.type||'video/mp4'});const u=URL.createObjectURL(blob);await loadVideoToCanvas(u,blob);resolve(blob)}catch(e){reject(e)}};reader.onerror=()=>reject(reader.error||new Error('Android FileReader could not read this video.'));reader.onabort=()=>reject(new Error('Video file read was cancelled.'));reader.readAsArrayBuffer(file)})}
 async function setFile(f){if(!f)return;if(!isVideoFile(f)){error('Please choose a video file such as MP4, MOV, WebM or MKV.');return}clearError();try{const u=URL.createObjectURL(f);try{await loadVideoToCanvas(u,f)}catch(firstError){try{if(u)URL.revokeObjectURL(u)}catch(_){}await readFileFallback(f)}}catch(e){error('Android could not open this video. If it is only in Google Photos/cloud storage, first download it to Device Storage/Files and select it there.');setProgress(0,'Choose a locally downloaded video from Files.');toast('Could not open video')}}
 $("choose").onclick=e=>{e.stopPropagation();try{fileEl.value=''}catch(_){}fileEl.click()};drop.onclick=e=>{if(e.target!==$("choose"))fileEl.click()};fileEl.onchange=e=>setFile(e.target.files?.[0]);drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');setFile(e.dataTransfer.files?.[0])};$("jumpUpload").onclick=()=>drop.scrollIntoView({behavior:'smooth',block:'center'});$("demoBtn").onclick=()=>{toast('Upload a video to activate the live editor')};
-const WHISPER_DEFAULT="Xenova/whisper-tiny";
-const AI_CHUNK_SECONDS=30;
-const AI_CHUNK_SAMPLES=AI_CHUNK_SECONDS*TARGET_SR;
-const AI_REQUEST_TIMEOUT=150000;
-const WORKER_CDN='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
-
-function chooseWhisperModel(requested){
-  if(requested&&requested!=='auto')return requested;
-  const dm=Number(navigator.deviceMemory||4),cores=Number(navigator.hardwareConcurrency||4);
-  return(dm>=6&&cores>=6)?'Xenova/whisper-base':WHISPER_DEFAULT;
-}
-
-async function getTranscriber(model){
-  const actual=chooseWhisperModel(model);
-  if(transcriber&&loadedModel===actual)return transcriber;
-  destroyWhisperWorker();
-  setProgress(5,'Loading '+actual.split('/').pop()+' q8 Whisper model…');
-  const cb=p=>{if(p.status==='progress')setProgress(5+(p.progress||0)*28,'Downloading Whisper model… '+Math.round(p.progress||0)+'%')};
-  if(actual.includes('turbo')){
-    if(!navigator.gpu)throw new Error('Large-v3 Turbo needs WebGPU. Use Auto, Tiny or Base on this browser.');
-    transcriber=await pipeline('automatic-speech-recognition',actual,{device:'webgpu',dtype:{encoder_model:'fp16',decoder_model_merged:'q4'},progress_callback:cb});
-  }else{
-    transcriber=await pipeline('automatic-speech-recognition',actual,{device:'wasm',dtype:'q8',progress_callback:cb});
-  }
-  loadedModel=actual;return transcriber;
-}
-
-async function audioFromVideo(file){
-  setProgress(3,'Extracting audio only…');
-  const AC=window.AudioContext||window.webkitAudioContext;
-  if(!AC)throw new Error('Web Audio is not supported in this browser.');
-  const bytes=await file.arrayBuffer();
-  const ctx=new AC({sampleRate:TARGET_SR});
-  let audioBuffer=null;
-  try{
-    audioBuffer=await ctx.decodeAudioData(bytes.slice(0));
-    const sourceRate=audioBuffer.sampleRate,channels=audioBuffer.numberOfChannels,frames=audioBuffer.length;
-    let mono16k;
-    if(sourceRate===TARGET_SR){
-      mono16k=new Float32Array(frames);
-      const data=Array.from({length:channels},(_,c)=>audioBuffer.getChannelData(c));
-      const sliceFrames=Math.max(TARGET_SR*2,Math.floor(sourceRate*2));
-      for(let start=0;start<frames;start+=sliceFrames){
-        const end=Math.min(frames,start+sliceFrames);
-        for(let i=start;i<end;i++){let v=0;for(let c=0;c<channels;c++)v+=data[c][i]||0;mono16k[i]=v/Math.max(1,channels)}
-        setProgress(5+(end/frames)*25,'Preparing mono 16 kHz audio… '+Math.round(end/frames*100)+'%');
-        await new Promise(r=>setTimeout(r,0));
-      }
-    }else{
-      const targetFrames=Math.ceil(frames*TARGET_SR/sourceRate);
-      const off=new OfflineAudioContext(1,targetFrames,TARGET_SR);
-      const src=off.createBufferSource(),mono=off.createBuffer(1,frames,sourceRate),out=mono.getChannelData(0);
-      const data=Array.from({length:channels},(_,c)=>audioBuffer.getChannelData(c));
-      for(let i=0;i<frames;i++){let v=0;for(let c=0;c<channels;c++)v+=data[c][i]||0;out[i]=v/Math.max(1,channels)}
-      src.buffer=mono;src.connect(off.destination);src.start();
-      const rendered=await off.startRendering();
-      mono16k=new Float32Array(rendered.getChannelData(0));
-    }
-    setProgress(34,'Audio ready — starting chunked AI transcription…');
-    return mono16k;
-  }finally{
-    audioBuffer=null;
-    try{await ctx.close()}catch(_){}
-  }
-}
-
-let whisperWorker=null,whisperWorkerURL=null,workerSeq=0;
-let smoothRAF=0,smoothValue=0,smoothTarget=0;
-function smoothProgress(target,msg){
-  smoothTarget=Math.max(0,Math.min(100,target));
-  if(msg)statusText.textContent=msg;
-  if(smoothRAF)return;
-  const step=()=>{
-    smoothValue+=(smoothTarget-smoothValue)*.16;
-    if(Math.abs(smoothTarget-smoothValue)<.15)smoothValue=smoothTarget;
-    progress.style.width=smoothValue+'%';statusPct.textContent=Math.round(smoothValue)+'%';
-    if(Math.abs(smoothTarget-smoothValue)>.15)smoothRAF=requestAnimationFrame(step);else smoothRAF=0;
-  };
-  smoothRAF=requestAnimationFrame(step);
-}
-
-function createWhisperWorker(){
-  if(whisperWorker)return whisperWorker;
-  const source=`
-    import { pipeline, env } from '${WORKER_CDN}';
-    env.allowLocalModels=false; env.useBrowserCache=true;
-    let pipe=null,modelName='';
-    const send=(id,type,payload={})=>self.postMessage({id,type,...payload});
-    self.onmessage=async(e)=>{
-      const {id,type,model,chunk,language}=e.data;
-      let heartbeat=0;
-      try{
-        if(type==='load'){
-          if(!pipe||modelName!==model){
-            const cb=p=>{if(p.status==='progress')send(id,'load-progress',{progress:p.progress||0})};
-            const isTurbo=model.includes('turbo');
-            pipe=await pipeline('automatic-speech-recognition',model,{
-              device:isTurbo?'webgpu':'wasm',
-              dtype:isTurbo?{encoder_model:'fp16',decoder_model_merged:'q4'}:'q8',
-              progress_callback:cb
-            });
-            modelName=model;
-          }
-          send(id,'loaded',{model:modelName});return;
-        }
-        if(type==='transcribe'){
-          if(!pipe||modelName!==model)throw new Error('Whisper model is not loaded.');
-          heartbeat=setInterval(()=>send(id,'heartbeat'),700);
-          const opts={
-            return_timestamps:'word',task:'transcribe',
-            chunk_length_s:${AI_CHUNK_SECONDS},stride_length_s:3,
-            no_speech_threshold:.3,condition_on_previous_text:false,temperature:0
-          };
-          if(language&&language!=='auto')opts.language=language;
-          const input=chunk;
-          const result=await pipe(input,opts);
-          clearInterval(heartbeat);heartbeat=0;
-          send(id,'result',{result});
-          return;
-        }
-      }catch(err){
-        if(heartbeat){clearInterval(heartbeat);heartbeat=0}
-        send(id,'error',{message:String(err?.message||err)});
-      }
-    };
-  `;
-  const blob=new Blob([source],{type:'application/javascript'});
-  whisperWorkerURL=URL.createObjectURL(blob);
-  try{whisperWorker=new Worker(whisperWorkerURL,{type:'module',name:'CAPIN-Whisper'});return whisperWorker}
-  catch(e){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null;whisperWorker=null;throw e}
-}
-function destroyWhisperWorker(){
-  if(whisperWorker){try{whisperWorker.terminate()}catch(_){}whisperWorker=null}
-  if(whisperWorkerURL){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null}
-}
-function workerRequest(type,payload,timeoutMs=AI_REQUEST_TIMEOUT){
-  const w=createWhisperWorker(),id=++workerSeq;
-  return new Promise((resolve,reject)=>{
-    let done=false;
-    const timer=setTimeout(()=>finish(new Error('TIMEOUT:AI processing exceeded the safety limit')),timeoutMs);
-    const handler=e=>{
-      const m=e.data||{};if(m.id!==id)return;
-      if(m.type==='load-progress'){smoothProgress(8+(m.progress||0)*30,'Loading Whisper model… '+Math.round(m.progress||0)+'%');return}
-      if(m.type==='heartbeat'){
-        const current=Number(progress.style.width.replace('%',''))||0;
-        smoothProgress(Math.min(96,current+.15),statusText.textContent||'Processing audio…');return;
-      }
-      if(m.type==='loaded')finish(null,m);
-      else if(m.type==='result')finish(null,m.result);
-      else if(m.type==='error')finish(new Error(m.message||'Whisper worker error'));
-    };
-    const finish=(err,val)=>{if(done)return;done=true;clearTimeout(timer);w.removeEventListener('message',handler);err?reject(err):resolve(val)};
-    w.addEventListener('message',handler);
-    try{if(payload.chunk)w.postMessage({id,type,...payload},[payload.chunk.buffer]);else w.postMessage({id,type,...payload})}
-    catch(e){finish(e)}
-  });
-}
-function cleanChunkWords(got,offset,chunkDuration){
-  const out=[];
-  for(const w of got||[]){
-    let start=Number(w.start)||0,end=Number(w.end)||start+.4;
-    start=Math.max(0,Math.min(chunkDuration,start));end=Math.max(start+.02,Math.min(chunkDuration,end));
-    out.push({word:w.word,start:start+offset,end:end+offset});
-  }
-  return out;
-}
-function dedupeWords(all){
-  const sorted=all.filter(w=>w.word&&w.word.trim()).sort((a,b)=>a.start-b.start||a.end-b.end),out=[];
-  for(const w of sorted){
-    const prev=out[out.length-1];
-    if(prev&&Math.abs(prev.start-w.start)<.18&&prev.word.trim().toLowerCase()===w.word.trim().toLowerCase()){
-      if(w.end>prev.end)prev.end=w.end;
-    }else out.push(w);
-  }
-  return out;
-}
-async function transcribeWithWorker(audio,model,lang){
-  const actual=chooseWhisperModel(model);
-  await workerRequest('load',{model:actual},60000);
-  const total=audio.length,totalChunks=Math.max(1,Math.ceil(total/AI_CHUNK_SAMPLES)),all=[];
-  for(let index=0,start=0;start<total;index++,start+=AI_CHUNK_SAMPLES){
-    const end=Math.min(total,start+AI_CHUNK_SAMPLES),offset=start/TARGET_SR,chunkDuration=(end-start)/TARGET_SR;
-    let chunk=audio.slice(start,end);
-    setProgress(38+(end/total)*58,'Processing chunk '+(index+1)+' of '+totalChunks+'…');
-    await new Promise(r=>setTimeout(r,0));
-    let result;
-    try{result=await workerRequest('transcribe',{model:actual,language:lang,chunk},AI_REQUEST_TIMEOUT)}
-    finally{chunk=null}
-    const got=cleanChunkWords(parseChunks(result),offset,chunkDuration);
-    if(got.length)all.push(...got);
-    else if(result?.text){
-      const parts=splitWords(result.text),dur=chunkDuration,totalG=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=offset;
-      for(const p of parts){const d=dur*graphemeLength(p)/totalG;all.push({word:p,start:t,end:t+d});t+=d}
-    }
-    await new Promise(r=>setTimeout(r,25));
-  }
-  return dedupeWords(all);
-}
-async function transcribeOnMainThreadFallback(audio,model,lang){
-  const pipe=await getTranscriber(model),total=audio.length,totalChunks=Math.max(1,Math.ceil(total/AI_CHUNK_SAMPLES)),all=[];
-  for(let index=0,start=0;start<total;index++,start+=AI_CHUNK_SAMPLES){
-    const end=Math.min(total,start+AI_CHUNK_SAMPLES),offset=start/TARGET_SR,chunkDuration=(end-start)/TARGET_SR;
-    let chunk=audio.slice(start,end);
-    setProgress(38+(end/total)*58,'Processing chunk '+(index+1)+' of '+totalChunks+'…');
-    await new Promise(r=>setTimeout(r,0));
-    try{
-      const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:AI_CHUNK_SECONDS,stride_length_s:3,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};
-      if(lang!=='auto')opts.language=lang;
-      const result=await pipe(chunk,opts),got=cleanChunkWords(parseChunks(result),offset,chunkDuration);
-      if(got.length)all.push(...got);
-    }finally{chunk=null;await new Promise(r=>setTimeout(r,25))}
-  }
-  return dedupeWords(all);
-}
-
-const graphemeSegmenter=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;
-function graphemeLength(s){return graphemeSegmenter?[...graphemeSegmenter.segment(s)].length:Array.from(s||'').length}
-function splitWords(s){return String(s||'').normalize('NFC').trim().split(/\s+/u).filter(Boolean)}
-function parseChunks(r){const out=[];let last=0;for(const c of r?.chunks||[]){const text=String(c.text||'').normalize('NFC').trim();if(!text)continue;if(/\s/u.test(text))return [];let [s,e]=Array.isArray(c.timestamp)?c.timestamp:[null,null];if(s==null)s=last;if(e==null||e<=s)e=s+.4;out.push({word:text,start:Number(s)||0,end:Number(e)||Number(s)+.4});last=e}return out}
-function parseSegments(r){const out=[];let last=0;for(const c of r?.chunks||[]){const parts=splitWords(c.text);if(!parts.length)continue;let[s,e]=Array.isArray(c.timestamp)?c.timestamp:[null,null];if(s==null)s=last;if(e==null||e<=s)e=s+.4*parts.length;const total=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=s;for(const p of parts){const d=(e-s)*graphemeLength(p)/total;out.push({word:p,start:t,end:t+d});t+=d}last=e}return out}
-function toSec(s){const [h,m,x]=s.replace(',','.').split(':');return +h*3600+ +m*60+parseFloat(x)}
-function parseSRT(txt){const out=[],re=/(\d+:\d+:\d+[,.]\d+)\s*-->\s*(\d+:\d+:\d+[,.]\d+)[^\n]*\n([\s\S]*?)(?=\n\s*\n|$)/g;let m;while((m=re.exec(txt.replace(/\r/g,'')))){const parts=m[3].replace(/<[^>]+>/g,' ').trim().split(/\s+/).filter(Boolean);if(!parts.length)continue;const s=toSec(m[1]),e=toSec(m[2]),tot=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=s;for(const p of parts){const d=(e-s)*graphemeLength(p)/tot;out.push({word:p,start:t,end:t+d});t+=d}}return out}
-function speechSpans(a){const fr=800,n=Math.floor(a.length/fr),rms=new Float32Array(n);for(let i=0;i<n;i++){let s=0;for(let j=0;j<fr;j++){const v=a[i*fr+j];s+=v*v}rms[i]=Math.sqrt(s/fr)}const sorted=[...rms].sort((a,b)=>a-b),noise=sorted[Math.floor(n*.1)]||0,peak=sorted[Math.floor(n*.95)]||0,th=noise+(peak-noise)*.12,spans=[];let st=null,gap=0;for(let i=0;i<n;i++){if(rms[i]>th){if(st===null)st=i;gap=0}else if(st!==null&&++gap>8){spans.push([st*.05,(i-gap+1)*.05]);st=null;gap=0}}if(st!==null)spans.push([st*.05,n*.05]);return spans.filter(s=>s[1]-s[0]>.25)}
-function alignText(parts,spans){const total=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p)+1,0)),D=spans.reduce((a,s)=>a+s[1]-s[0],0);let si=0,pos=spans[0]?.[0]||0;return parts.map(p=>{let need=D*(graphemeLength(p)+1)/total,start=null,end=pos;while(need>1e-6&&si<spans.length){const avail=spans[si][1]-pos;if(start===null)start=pos;if(need<=avail){pos+=need;end=pos;need=0}else{need-=avail;end=spans[si][1];si++;if(si<spans.length)pos=spans[si][0]}}return{word:p,start:start??end,end}})}
+function languageCode(value){const map={auto:null,english:'en',hindi:'hi',punjabi:'pa',spanish:'es',french:'fr',german:'de',japanese:'ja',korean:'ko',portuguese:'pt',arabic:'ar',bengali:'bn',urdu:'ur',russian:'ru',chinese:'zh'};return map[value]??value||null}
+function chooseAutoModel(){const ram=Number(navigator.deviceMemory||4),cores=Number(navigator.hardwareConcurrency||4);if(navigator.gpu&&ram>=8&&cores>=8)return 'onnx-community/whisper-large-v3-turbo';if(ram>=6&&cores>=6)return 'Xenova/whisper-base';return 'Xenova/whisper-tiny'}
+function saferModel(model){if(model.includes('turbo'))return 'Xenova/whisper-base';if(model==='Xenova/whisper-small')return 'Xenova/whisper-base';if(model==='Xenova/whisper-base')return 'Xenova/whisper-tiny';return 'Xenova/whisper-tiny'}
+function resolveModel(requested){if(requested==='auto'||!requested)return chooseAutoModel();if(requested.includes('turbo')&&!navigator.gpu)return 'Xenova/whisper-base';return requested}
+async function getTranscriber(model){if(transcriber&&loadedModel===model)return transcriber;if(transcriber&&loadedModel!==model){try{await transcriber.dispose?.()}catch(_){}transcriber=null;loadedModel=null}setProgress(5,'Loading Whisper model… first use downloads model files.');const cb=p=>{if(p.status==='progress')setProgress(5+(p.progress||0)*.3,'Downloading model… '+Math.round(p.progress||0)+'%')};if(model.includes('turbo')){if(!navigator.gpu)throw new Error('WebGPU is unavailable for this model.');transcriber=await pipeline('automatic-speech-recognition',model,{device:'webgpu',dtype:{encoder_model:'fp16',decoder_model_merged:'q4'},progress_callback:cb})}else transcriber=await pipeline('automatic-speech-recognition',model,{device:'wasm',dtype:'q8',progress_callback:cb});loadedModel=model;return transcriber}
+async function audioFromVideo(file){setProgress(3,'Extracting audio…');const bytes=await file.arrayBuffer();const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error('Web Audio is not supported in this browser.');const ctx=new AC({sampleRate:TARGET_SR});try{const audioBuffer=await ctx.decodeAudioData(bytes.slice(0));const duration=audioBuffer.duration||audioBuffer.length/audioBuffer.sampleRate;setProgress(34,'Audio ready — starting AI transcription…');return{buffer:audioBuffer,duration,sampleRate:audioBuffer.sampleRate}}catch(e){throw new Error('Could not decode audio from this video: '+(e.message||e))}finally{try{await ctx.close()}catch(_){}}}
+function makeAudioChunk(source,startSec,endSec,sampleRate){const sr=source.sampleRate||sampleRate||TARGET_SR,start=Math.max(0,Math.floor(startSec*sr)),end=Math.min(source.length,Math.ceil(endSec*sr)),frames=Math.max(0,end-start),channels=source.numberOfChannels||1;if(!frames)return new Float32Array(0);const data=Array.from({length:channels},(_,c)=>source.getChannelData(c));if(sr===TARGET_SR){const out=new Float32Array(frames);for(let i=0;i<frames;i++){let v=0;for(let c=0;c<channels;c++)v+=data[c][start+i]||0;out[i]=v/channels}return out}const outLen=Math.max(1,Math.round(frames*TARGET_SR/sr)),out=new Float32Array(outLen),ratio=sr/TARGET_SR;for(let i=0;i<outLen;i++){const pos=i*ratio,index=Math.floor(pos),frac=pos-index;let a=0,b=0;for(let c=0;c<channels;c++){a+=data[c][start+index]||0;b+=data[c][Math.min(end-1,start+index+1)]||0}a/=channels;b/=channels;out[i]=a+(b-a)*frac}return out}
+const WORKER_CDN='https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';let whisperWorker=null,whisperWorkerURL=null,workerSeq=0;let smoothRAF=0,smoothValue=0,smoothTarget=0;
+function smoothProgress(target,msg){smoothTarget=Math.max(0,Math.min(100,target));if(msg)statusText.textContent=msg;if(smoothRAF)return;const step=()=>{smoothValue+=(smoothTarget-smoothValue)*.16;if(Math.abs(smoothTarget-smoothValue)<.15)smoothValue=smoothTarget;progress.style.width=smoothValue+'%';statusPct.textContent=Math.round(smoothValue)+'%';if(Math.abs(smoothTarget-smoothValue)>.15)smoothRAF=requestAnimationFrame(step);else smoothRAF=0};smoothRAF=requestAnimationFrame(step)}
+function createWhisperWorker(){if(whisperWorker)return whisperWorker;const source=`import{pipeline,env}from'${WORKER_CDN}';env.allowLocalModels=false;env.useBrowserCache=true;let pipe=null,modelName='';const send=(id,type,payload={})=>self.postMessage({id,type,...payload});self.onmessage=async e=>{const{id,type,model,chunk,language}=e.data;try{if(type==='load'){if(!pipe||modelName!==model){const cb=p=>{if(p.status==='progress')send(id,'load-progress',{progress:p.progress||0})};const isTurbo=model.includes('turbo');pipe=await pipeline('automatic-speech-recognition',model,{device:isTurbo?'webgpu':'wasm',dtype:isTurbo?{encoder_model:'fp16',decoder_model_merged:'q4'}:'q8',progress_callback:cb});modelName=model}send(id,'loaded',{model:modelName});return}if(type==='transcribe'){if(!pipe||modelName!==model)throw new Error('Whisper model is not loaded.');const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:30,stride_length_s:2,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};if(language)opts.language=language;const heartbeat=setInterval(()=>send(id,'heartbeat'),900);let result=null;try{result=await pipe(chunk,opts)}finally{clearInterval(heartbeat)}send(id,'result',{result});result=null}}catch(err){send(id,'error',{message:String(err?.message||err)})}};`;const blob=new Blob([source],{type:'application/javascript'});whisperWorkerURL=URL.createObjectURL(blob);try{whisperWorker=new Worker(whisperWorkerURL,{type:'module',name:'CAPIN-Whisper'});return whisperWorker}catch(e){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null;whisperWorker=null;throw e}}
+function destroyWhisperWorker(){if(whisperWorker){try{whisperWorker.terminate()}catch(_){}whisperWorker=null}if(whisperWorkerURL){try{URL.revokeObjectURL(whisperWorkerURL)}catch(_){}whisperWorkerURL=null}}
+function workerRequest(type,payload,timeoutMs=180000){const w=createWhisperWorker(),id=++workerSeq;return new Promise((resolve,reject)=>{let done=false;const timer=setTimeout(()=>finish(new Error('TIMEOUT:AI chunk exceeded the safety timeout')),timeoutMs);const handler=e=>{const m=e.data||{};if(m.id!==id)return;if(m.type==='heartbeat'){return}if(m.type==='load-progress'){smoothProgress(8+(m.progress||0)*30,'Loading Whisper model… '+Math.round(m.progress||0)+'%');return}if(m.type==='loaded')finish(null,m);else if(m.type==='result')finish(null,m.result);else if(m.type==='error')finish(new Error(m.message||'Whisper worker error'))};const finish=(err,val)=>{if(done)return;done=true;clearTimeout(timer);w.removeEventListener('message',handler);err?reject(err):resolve(val)};w.addEventListener('message',handler);try{if(payload.chunk)w.postMessage({id,type,...payload},[payload.chunk.buffer]);else w.postMessage({id,type,...payload})}catch(e){finish(e)}})}
+const graphemeSegmenter=typeof Intl!=='undefined'&&Intl.Segmenter?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;function graphemeLength(s){return graphemeSegmenter?[...graphemeSegmenter.segment(s)].length:Array.from(s||'').length}function splitWords(s){return String(s||'').normalize('NFC').trim().split(/\s+/u).filter(Boolean)}
+function hasArabicScript(s){return/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/u.test(s)}
+const shahmukhiMap={'ا':'ਅ','آ':'ਆ','ب':'ਬ','پ':'ਪ','ت':'ਤ','ٹ':'ਟ','ث':'ਸ','ج':'ਜ','چ':'ਚ','ح':'ਹ','خ':'ਖ','د':'ਦ','ڈ':'ਡ','ذ':'ਜ਼','ر':'ਰ','ڑ':'ੜ','ز':'ਜ਼','ژ':'ਝ','س':'ਸ','ش':'ਸ਼','ص':'ਸ','ض':'ਜ਼','ط':'ਤ','ظ':'ਜ਼','ع':'ਅ','غ':'ਗ਼','ف':'ਫ','ق':'ਕ','ک':'ਕ','گ':'ਗ','ل':'ਲ','م':'ਮ','ن':'ਨ','ں':'ਂ','و':'ਵ','ہ':'ਹ','ھ':'੍ਹ','ء':'ਅ','ی':'ੀ','ے':'ੇ','ئ':'ਈ','ؤ':'ਊ','ۃ':'ਤ','ة':'ਤ','۔':'।','،':'،','؟':'?'};
+function shahmukhiToGurmukhi(text){let out='';for(const ch of text){if(shahmukhiMap[ch])out+=shahmukhiMap[ch];else if(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/u.test(ch))out+=ch===' '||ch==='\n'?' ':'';else out+=ch}return out.normalize('NFC')}
+function normalizeCaptionText(text,lang){let s=String(text||'').normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g,'').trim();if(lang==='hi'){return s.replace(/[\u0640]/g,'').normalize('NFC')}if(lang==='pa'&&hasArabicScript(s))return shahmukhiToGurmukhi(s);return s}
+function parseChunks(r,lang){const out=[];let last=0;for(const c of r?.chunks||[]){const text=normalizeCaptionText(c.text,lang),parts=splitWords(text);if(!parts.length)continue;let[s,e]=Array.isArray(c.timestamp)?c.timestamp:[null,null];if(s==null)s=last;if(e==null||e<=s)e=s+.4*parts.length;const total=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=Number(s)||0;for(const p of parts){const d=(Number(e)-Number(s))*graphemeLength(p)/total;out.push({word:p,start:t,end:t+d});t+=d}last=Number(e)||t}return out}
+function sameWord(a,b){return a.normalize('NFC').trim().toLocaleLowerCase()===b.normalize('NFC').trim().toLocaleLowerCase()}
+function mergeCaptionWords(all){all.sort((a,b)=>a.start-b.start||a.end-b.end);const out=[];for(const w of all){if(!w.word||!w.word.trim())continue;const prev=out[out.length-1];if(prev&&sameWord(prev.word,w.word)&&w.start<=prev.end+.65){prev.end=Math.max(prev.end,w.end);continue}out.push({word:w.word.normalize('NFC'),start:Math.max(0,w.start),end:Math.max(w.start+.05,w.end)})}return out}
+async function transcribeChunkWithRetry(chunk,model,lang,index,total){const lc=languageCode(lang),attempts=[model],lighter=saferModel(model);if(lighter!==model)attempts.push(lighter);let lastError=null;for(let a=0;a<attempts.length;a++){const activeModel=attempts[a];try{if(a>0){destroyWhisperWorker();setProgress(40,'Retrying chunk '+(index+1)+' with a lighter model…');await new Promise(r=>setTimeout(r,80))}await workerRequest('load',{model:activeModel},180000);return await workerRequest('transcribe',{model:activeModel,language:lc,chunk},240000)}catch(e){lastError=e}}throw lastError||new Error('Chunk failed.')}
+async function transcribeWithWorker(audioInfo,model,lang){const source=audioInfo.buffer,totalDuration=audioInfo.duration||source.duration||source.length/source.sampleRate,CHUNK_SEC=30,OVERLAP_SEC=2,STEP_SEC=28,totalChunks=Math.max(1,Math.ceil(Math.max(0,totalDuration-OVERLAP_SEC)/STEP_SEC)),all=[],failed=[];for(let i=0;i<totalChunks;i++){const startSec=i*STEP_SEC,endSec=Math.min(totalDuration,startSec+CHUNK_SEC);let chunk=null;try{chunk=makeAudioChunk(source,startSec,endSec,audioInfo.sampleRate);setProgress(38+(startSec/Math.max(1,totalDuration))*58,'Processing chunk '+(i+1)+' of '+totalChunks+'…');await new Promise(r=>setTimeout(r,20));const result=await transcribeChunkWithRetry(chunk,model,lang,i,totalChunks),got=parseChunks(result,languageCode(lang)).map(w=>({...w,start:w.start+startSec,end:w.end+startSec}));if(got.length)all.push(...got);else if(result?.text){const text=normalizeCaptionText(result.text,languageCode(lang)),parts=splitWords(text),dur=Math.max(.1,endSec-startSec),totalG=Math.max(1,parts.reduce((a,p)=>a+graphemeLength(p),0));let t=startSec;for(const p of parts){const d=dur*graphemeLength(p)/totalG;all.push({word:p,start:t,end:t+d});t+=d}}}catch(e){failed.push(i+1);toast('Chunk '+(i+1)+' failed — continuing')}finally{chunk=null;await new Promise(r=>setTimeout(r,35))}}if(failed.length)error('Caption recovery skipped chunk(s): '+failed.join(', ')+'. Other chunks were preserved. Try Auto/Tiny for the missing speech.');return mergeCaptionWords(all)}
+async function transcribeOnMainThreadFallback(audioInfo,model,lang){if((audioInfo.duration||0)>60)throw new Error('Worker unavailable for a long video.');const pipe=await getTranscriber(model),source=audioInfo.buffer,totalDuration=audioInfo.duration||source.duration||source.length/source.sampleRate,all=[];for(let i=0;i<Math.ceil(totalDuration/30);i++){const start=i*30,end=Math.min(totalDuration,start+30),chunk=makeAudioChunk(source,start,end,audioInfo.sampleRate),lc=languageCode(lang);setProgress(40+(start/Math.max(1,totalDuration))*55,'Processing chunk '+(i+1)+'…');const opts={return_timestamps:'word',task:'transcribe',chunk_length_s:30,stride_length_s:2,no_speech_threshold:.3,condition_on_previous_text:false,temperature:0};if(lc)opts.language=lc;let result=null;try{result=await pipe(chunk,opts);all.push(...parseChunks(result,lc).map(w=>({...w,start:w.start+start,end:w.end+start})))}finally{result=null}}return mergeCaptionWords(all)}
 generate.onclick=async()=>{
  if(!currentFile)return;
  generate.disabled=exportVideo.disabled=true;clearError();
- let audio=null;
+ let audioInfo=null;
  try{
-  audio=await audioFromVideo(currentFile);
-  const requestedModel=$("model").value,lang=$("language").value;
-  const actualModel=chooseWhisperModel(requestedModel);
-  setProgress(36,'Using '+actualModel.split('/').pop()+' q8 — preparing 30-second chunks…');
-  let resultWords=[];
-  try{
-   resultWords=await transcribeWithWorker(audio,requestedModel,lang);
-  }catch(workerErr){
-   const msg=String(workerErr?.message||workerErr);
-   destroyWhisperWorker();
-   // Main-thread inference is deliberately avoided for long videos because it
-   // can freeze mobile browsers. Only use the fallback for a short clip.
-   const shortEnough=audio.length<=60*TARGET_SR;
-   if(!shortEnough)throw workerErr;
-   setProgress(40,'Worker unavailable — using short-clip fallback…');
-   resultWords=await transcribeOnMainThreadFallback(audio,requestedModel,lang);
-  }
-  words=resultWords;
-  if(!words.length)throw new Error('No speech detected.');
-  originalWords=structuredClone(words);
-  finishCaptions();
-  smoothProgress(100,'Captions ready — edit, style, then export.');
-  toast('AI captions generated');
+  audioInfo=await audioFromVideo(currentFile);
+  const requested=$("model").value,model=resolveModel(requested),lang=$("language").value;
+  if(requested!==model&&requested.includes('turbo'))toast('WebGPU unavailable — using Base safely.');
+  setProgress(36,'Language: '+(lang==='auto'?'Auto detect':lang)+' • Model: '+model.split('/').pop());
+  let resultWords=await transcribeWithWorker(audioInfo,model,lang);
+  if(!resultWords.length)throw new Error('No speech detected.');
+  words=resultWords;originalWords=structuredClone(words);finishCaptions();smoothProgress(100,'Captions ready — edit, style, then export.');toast('AI captions generated');
  }catch(e){
   const msg=String(e?.message||e);
-  if(msg.startsWith('TIMEOUT:')){
-   error('A 30-second AI chunk exceeded the device safety limit. The page stayed responsive; try Auto/Tiny, or use Manual Caption Mode.');
-   setProgress(0,'AI chunk timed out — Manual Caption Mode ready.');
-  }else{
-   error('Transcription error: '+(e.message||e));
-   setProgress(0,'Transcription failed — Manual Caption Mode ready.');
-  }
- }finally{
-  // Release the complete per-video PCM buffer as soon as transcription ends.
-  audio=null;
-  generate.disabled=false;
-  exportVideo.disabled=!words.length;
- }
+  if(msg.includes('Worker')||msg.includes('worker')||msg.includes('module')){try{setProgress(40,'Worker unavailable — trying short-clip fallback…');if(audioInfo&&audioInfo.duration<=60){const model=resolveModel($("model").value),lang=$("language").value;words=await transcribeOnMainThreadFallback(audioInfo,model,lang);if(!words.length)throw new Error('No speech detected.');originalWords=structuredClone(words);finishCaptions();smoothProgress(100,'Captions ready — edit, style, then export.');toast('AI captions generated')}else throw e}catch(f){error('Transcription error: '+(f.message||f));setProgress(0,'Transcription failed — try Auto/Tiny or Manual Caption Mode.')}}else{error('Transcription error: '+msg);setProgress(0,'Transcription failed — try Auto/Tiny or Manual Caption Mode.')}}
+ }finally{audioInfo=null;generate.disabled=false;exportVideo.disabled=!words.length}
 }
 useText.onclick=async()=>{const txt=$("transcript").value.trim();if(!txt||!currentFile)return;clearError();generate.disabled=exportVideo.disabled=useText.disabled=true;try{let w=parseSRT(txt);if(!w.length){const audio=await audioFromVideo(currentFile);setProgress(60,'Aligning transcript to speech…');let spans=speechSpans(audio);if(!spans.length)spans=[[0,audio.length/TARGET_SR]];w=alignText(txt.split(/\s+/).filter(Boolean),spans)}if(!w.length)throw new Error('Transcript is empty.');words=w;originalWords=structuredClone(words);finishCaptions();setProgress(100,'Transcript ready — timing editor is active.');toast('Transcript loaded')}catch(e){error('Transcript error: '+(e.message||e));setProgress(0,'Failed.')}finally{generate.disabled=false;useText.disabled=false}}
 function finishCaptions(){rebuild();renderWords();renderTimeline();$("editor").classList.remove('hidden');exportVideo.disabled=false;video.currentTime=0;updatePreview(true)}
