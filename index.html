@@ -40,7 +40,7 @@
 <section class="workspace" id="studio">
 <div>
 <div class="card"><div class="cardHead"><div><h2>01 — Create captions</h2><span class="sub">Your video stays in this browser tab.</span></div><span class="eyebrow">Local AI</span></div><div class="cardBody">
-<div class="upload" id="drop"><div class="uploadIcon">↑</div><strong>Drop your video here</strong><small>MP4, MOV, WebM and common browser formats</small><button class="btn primary" id="choose">Choose video</button><input id="videoInput" type="file" accept="video/*,.mp4,.mov,.webm,.mkv,.avi" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;opacity:0;pointer-events:none"><div class="tiny">For best performance, use a short-form clip under 5 minutes.</div></div>
+<div class="upload" id="drop"><div class="uploadIcon">↑</div><strong>Drop your video here</strong><small>MP4, MOV, WebM and common browser formats</small><button class="btn primary" id="choose">Choose video</button><input id="videoInput" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv,.avi,.3gp,.mpeg,.mpg,.ogv" aria-label="Choose video file" style="position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none"><div class="tiny">For best performance, use a short-form clip under 5 minutes.</div></div>
 <div class="controls">
 <div class="two"><div class="field"><label>Language</label><select id="language"><option value="auto">Auto detect</option><option value="english">English</option><option value="hindi">Hindi</option><option value="punjabi">Punjabi</option><option value="spanish">Spanish</option><option value="french">French</option><option value="german">German</option><option value="japanese">Japanese</option><option value="korean">Korean</option><option value="portuguese">Portuguese</option><option value="arabic">Arabic</option><option value="bengali">Bengali</option><option value="urdu">Urdu</option><option value="russian">Russian</option><option value="chinese">Chinese</option></select></div><div class="field"><label>Whisper model</label><select id="model"><option value="Xenova/whisper-base" selected>Base — balanced</option><option value="Xenova/whisper-small">Small — better multilingual</option><option value="onnx-community/whisper-large-v3-turbo">Large-v3 Turbo — WebGPU</option><option value="Xenova/whisper-tiny">Tiny — fastest</option></select></div></div>
 <div class="two"><div class="field"><label>Aspect ratio</label><select id="ratio"><option value="16:9">16:9 YouTube</option><option value="9:16">9:16 Reels / Shorts</option><option value="1:1">1:1 Square</option></select></div><div class="field"><label>Position</label><select id="position"><option value="bottom">Bottom</option><option value="mid">Middle</option><option value="top">Top</option></select></div></div>
@@ -81,7 +81,37 @@ function resetAfterFile(){generate.disabled=false;useText.disabled=false;exportV
 function loadVideoToCanvas(url,sourceFile){return new Promise((resolve,reject)=>{const old=videoURL;if(old&&old!==url)try{URL.revokeObjectURL(old)}catch(_){}videoURL=url;currentFile=sourceFile;video.pause();video.removeAttribute('src');video.load();const ok=()=>{cleanup();clearError();resetAfterFile();setProgress(0,'Video loaded. Generate captions or paste your transcript.');toast('Video ready');resolve(true)};const bad=()=>{cleanup();reject(new Error('Android could not decode this local video URL.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('canplay',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('canplay',ok,{once:true});video.addEventListener('error',bad,{once:true});video.src=url;video.load();setTimeout(()=>{if(video.readyState>=1)ok()},1200)})}
 function readFileFallback(file){return new Promise((resolve,reject)=>{setProgress(1,'Reading video through Android file fallback…');const reader=new FileReader();reader.onload=async evt=>{try{const blob=new Blob([evt.target.result],{type:file.type||'video/mp4'});const u=URL.createObjectURL(blob);await loadVideoToCanvas(u,blob);resolve(blob)}catch(e){reject(e)}};reader.onerror=()=>reject(reader.error||new Error('Android FileReader could not read this video.'));reader.onabort=()=>reject(new Error('Video file read was cancelled.'));reader.readAsArrayBuffer(file)})}
 async function setFile(f){if(!f)return;if(!isVideoFile(f)){error('Please choose a video file such as MP4, MOV, WebM or MKV.');return}clearError();try{const u=URL.createObjectURL(f);try{await loadVideoToCanvas(u,f)}catch(firstError){try{if(u)URL.revokeObjectURL(u)}catch(_){}await readFileFallback(f)}}catch(e){error('Android could not open this video. If it is only in Google Photos/cloud storage, first download it to Device Storage/Files and select it there.');setProgress(0,'Choose a locally downloaded video from Files.');toast('Could not open video')}}
-const openFilePicker=()=>{try{fileEl.value=""}catch(_){}try{fileEl.click()}catch(e){error("Could not open the file picker. Please tap Choose video again.")}};$("choose").addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openFilePicker()});drop.addEventListener("click",e=>{if(e.target!==$("choose"))openFilePicker()});fileEl.addEventListener("change",e=>{const f=e.target.files&&e.target.files[0];if(f)setFile(f)});drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};drop.ondragleave=()=>drop.classList.remove('drag');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');setFile(e.dataTransfer.files?.[0])};$("jumpUpload").onclick=()=>drop.scrollIntoView({behavior:'smooth',block:'center'});$("demoBtn").onclick=()=>{toast('Upload a video to activate the live editor')};
+function openVideoPicker(){
+  try{fileEl.value='"'"'"'"'"';}catch(_){}
+  try{
+    if(typeof fileEl.showPicker==='"'"'function'"'"'){
+      fileEl.showPicker();
+      return;
+    }
+  }catch(_){/* fall through to the universal click path */}
+  try{fileEl.click();}
+  catch(e){error('"'"'Could not open the file picker. Please tap Choose video again.'"'"');}
+}
+$("choose").addEventListener("click",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  openVideoPicker();
+});
+drop.addEventListener("click",e=>{
+  if(e.target!==$("choose")) openVideoPicker();
+});
+fileEl.addEventListener("change",e=>{
+  const f=e.target?.files?.[0];
+  if(f) setFile(f);
+});
+fileEl.addEventListener("input",e=>{
+  const f=e.target?.files?.[0];
+  if(f) setFile(f);
+});
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('"'"'drag'"'"')};
+drop.ondragleave=()=>drop.classList.remove('"'"'drag'"'"');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('"'"'drag'"'"');setFile(e.dataTransfer?.files?.[0])};
+$("jumpUpload").onclick=()=>drop.scrollIntoView({behavior:'smooth',block:'center'});$("demoBtn").onclick=()=>{toast('Upload a video to activate the live editor')};
 function languageCode(value){const map={auto:null,english:'en',hindi:'hi',punjabi:'pa',spanish:'es',french:'fr',german:'de',japanese:'ja',korean:'ko',portuguese:'pt',arabic:'ar',bengali:'bn',urdu:'ur',russian:'ru',chinese:'zh'};return map[value]??value||null}
 function chooseAutoModel(){const ram=Number(navigator.deviceMemory||4),cores=Number(navigator.hardwareConcurrency||4);if(navigator.gpu&&ram>=8&&cores>=8)return 'onnx-community/whisper-large-v3-turbo';if(ram>=6&&cores>=6)return 'Xenova/whisper-base';return 'Xenova/whisper-tiny'}
 function saferModel(model){if(model.includes('turbo'))return 'Xenova/whisper-base';if(model==='Xenova/whisper-small')return 'Xenova/whisper-base';if(model==='Xenova/whisper-base')return 'Xenova/whisper-tiny';return 'Xenova/whisper-tiny'}
