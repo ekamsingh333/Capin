@@ -93,12 +93,76 @@ input[type=color]{min-height:46px;padding:4px!important;cursor:pointer}input[typ
 .rv.in{opacity:1;transform:none;filter:none}
 @media(max-width:1000px){.phone{animation:none}.card{backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition-duration:.01s!important}.rv{opacity:1;transform:none;filter:none}html{scroll-behavior:auto}}
+
+/* === LIQUID GLASS / METAL CTA BUTTONS — integrated into standalone CAPIN HTML === */
+.liquid-btn{
+  --lb-text:#fff;
+  --lb-accent:#f5ff3d;
+  position:relative; isolation:isolate; overflow:hidden;
+  display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  min-height:44px; padding:0 20px; border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; color:var(--lb-text); background:rgba(255,255,255,.055);
+  box-shadow:
+    0 0 6px rgba(0,0,0,.03),0 2px 8px rgba(0,0,0,.12),
+    inset 2px 2px .5px -2px rgba(255,255,255,.72),
+    inset -2px -2px .5px -2px rgba(0,0,0,.8),
+    inset 0 0 10px 4px rgba(255,255,255,.035);
+  backdrop-filter:blur(14px) saturate(1.35);
+  -webkit-backdrop-filter:blur(14px) saturate(1.35);
+  transition:transform .28s var(--ease),filter .28s,box-shadow .35s,border-color .3s;
+}
+.liquid-btn::before{
+  content:""; position:absolute; inset:0; z-index:-1; border-radius:inherit;
+  background:radial-gradient(circle at 28% 10%,rgba(255,255,255,.25),transparent 32%),
+             linear-gradient(135deg,rgba(245,255,61,.12),rgba(85,233,255,.07) 60%,transparent);
+  opacity:.9; transition:opacity .3s;
+}
+.liquid-btn::after{
+  content:""; position:absolute; top:-20%; left:-70%; width:42%; height:140%;
+  transform:skewX(-20deg); background:linear-gradient(90deg,transparent,rgba(255,255,255,.48),transparent);
+  transition:left .8s var(--ease); pointer-events:none;
+}
+.liquid-btn:hover:not(:disabled){transform:translateY(-2px) scale(1.02);filter:brightness(1.1);border-color:rgba(255,255,255,.32);box-shadow:0 12px 34px rgba(245,255,61,.16),inset 0 0 14px rgba(255,255,255,.06)}
+.liquid-btn:hover:not(:disabled)::after{left:130%}
+.liquid-btn:active:not(:disabled){transform:translateY(1px) scale(.98)}
+.liquid-btn:disabled{opacity:.42;cursor:not-allowed;filter:none}
+.liquid-btn.primary-glass{color:#09090a;background:linear-gradient(180deg,rgba(245,255,61,.96),rgba(245,255,61,.76));border-color:#f5ff3d;box-shadow:0 8px 28px rgba(245,255,61,.18),inset 0 1px 0 rgba(255,255,255,.55)}
+.liquid-btn.cyan-glass{color:#071013;background:linear-gradient(180deg,rgba(85,233,255,.96),rgba(85,233,255,.72));border-color:#55e9ff;box-shadow:0 8px 28px rgba(85,233,255,.16),inset 0 1px 0 rgba(255,255,255,.55)}
+
+.metal-btn{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  min-height:44px; padding:1.5px; border:0; border-radius:13px; color:#fff;
+  background:linear-gradient(180deg,#000,#8e8e8e); cursor:pointer;
+  box-shadow:0 3px 8px rgba(0,0,0,.14); transition:transform .25s var(--ease),box-shadow .25s,filter .25s;
+}
+.metal-btn .metal-inner{
+  position:relative; display:flex; align-items:center; justify-content:center; gap:8px;
+  min-height:41px; width:100%; padding:0 18px; border-radius:11px;
+  background:linear-gradient(180deg,#d2d2d2,#555 48%,#aaa);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.75),inset 0 -2px 5px rgba(0,0,0,.35);
+  text-shadow:0 -1px 0 rgba(40,40,40,.9);
+  overflow:hidden;
+}
+.metal-btn .metal-inner::after{
+  content:""; position:absolute; inset:0; background:linear-gradient(105deg,transparent 20%,rgba(255,255,255,.34) 48%,transparent 70%);
+  transform:translateX(-130%); transition:transform .75s var(--ease); pointer-events:none;
+}
+.metal-btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.06);box-shadow:0 8px 20px rgba(0,0,0,.22)}
+.metal-btn:hover:not(:disabled) .metal-inner::after{transform:translateX(130%)}
+.metal-btn:active:not(:disabled){transform:translateY(2px) scale(.985)}
+.metal-btn:disabled{opacity:.42;cursor:not-allowed;filter:none}
+.metal-btn.gold{background:linear-gradient(180deg,#917100,#ead98f)}
+.metal-btn.gold .metal-inner{background:linear-gradient(180deg,#ffeaa0,#8d7630 52%,#c8ae57)}
+.metal-btn.cyan{background:linear-gradient(180deg,#006c78,#75e7f4)}
+.metal-btn.cyan .metal-inner{background:linear-gradient(180deg,#b8f8ff,#147e8a 52%,#55c8d5)}
+@media(prefers-reduced-motion:reduce){.liquid-btn,.metal-btn,.metal-btn .metal-inner{transition:none!important}.liquid-btn::after,.metal-btn .metal-inner::after{display:none}}
+
 </style>
 </head>
 <body>
 <!-- === CAPIN CYBERPUNK SPLASH LOADER — ISOLATED ADDITION === --><div id="appLoader" aria-label="Loading CAPIN"><div class="loaderCore"><div class="loaderGlow"></div><h2 class="loaderTitle">CAPIN</h2><svg class="loaderRing" viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="39"></circle><circle class="cyanArc" cx="50" cy="50" r="39"></circle><circle class="yellowArc" cx="50" cy="50" r="39"></circle></svg><p class="loaderStatus" id="appLoaderStatus">INITIALIZING CAPIN CORE...</p></div></div><!-- === END ISOLATED LOADER HTML === -->
 <div class="app"><div class="shell">
-<header class="topbar"><a class="brand" href="#top"><i class="mark"></i>CAPIN<span>.</span></a><nav class="nav"><a href="#studio">Studio</a><a href="#styles">Styles</a><a href="#editor">Editor</a><a href="#export">Export</a></nav><div class="navActions"><button class="btn" id="demoBtn">Demo</button><button class="btn primary" id="jumpUpload">Start creating</button></div></header>
+<header class="topbar"><a class="brand" href="#top"><i class="mark"></i>CAPIN<span>.</span></a><nav class="nav"><a href="#studio">Studio</a><a href="#styles">Styles</a><a href="#editor">Editor</a><a href="#export">Export</a></nav><div class="navActions"><button class="liquid-btn" id="demoBtn" type="button">Demo</button><button class="liquid-btn primary-glass" id="jumpUpload" type="button">Start creating</button></div></header>
 <section class="hero" id="top"><div><span class="eyebrow"><i class="dot"></i> Browser AI • No upload required</span><h1>Captions that <span class="grad">move.</span></h1><p>Turn your video into polished, word-synced captions directly in your browser. Transcribe, edit every word, style the look, preview it live, and burn it into your export.</p><div class="heroStats"><div class="stat"><b>Whisper</b> client-side AI</div><div class="stat"><b>Word-level</b> timing</div><div class="stat"><b>WebGPU</b> + WASM</div><div class="stat"><b>MP4/WebM</b> recording</div></div></div><div class="heroVisual"><div class="phone"><div class="fakeVideo"><div class="fakeCaption">Make it <b>pop.</b><br>Make it yours.</div></div></div><div class="floatCard"><b>01 / 00:18.42</b>word-perfect preview</div></div></section>
 <section class="workspace" id="studio">
 <div>
@@ -113,7 +177,7 @@ input[type=color]{min-height:46px;padding:4px!important;cursor:pointer}input[typ
 <div class="two"><div class="field"><label>Text color</label><input class="control" id="textColor" type="color" value="#ffffff"></div><div class="field"><label>Highlight color</label><input class="control" id="highlightColor" type="color" value="#f5ff3d"></div></div>
 <div class="two"><div class="field"><label>Stroke <span id="strokeOut">5</span></label><div class="rangeRow"><input class="range" id="stroke" type="range" min="0" max="12" value="5"><output>5</output></div></div><div class="field"><label>Glow <span id="glowOut">12</span></label><div class="rangeRow"><input class="range" id="glow" type="range" min="0" max="35" value="12"><output>12</output></div></div></div>
 </div>
-<div class="actions"><button class="btn primary" id="generate" disabled>Generate AI captions</button><button class="btn cyan" id="exportVideo" disabled>Export captioned video</button></div>
+<div class="actions"><button class="liquid-btn primary-glass" id="generate" disabled>Generate AI captions</button><button class="metal-btn cyan" id="exportVideo" disabled><span class="metal-inner">Export captioned video</span></button></div>
 <div class="status"><div class="statusline"><span id="statusText">Choose a video to begin.</span><b id="statusPct">0%</b></div><div class="bar"><i id="progress"></i></div></div><div id="error" class="error hidden"></div>
 <details style="margin-top:14px"><summary style="cursor:pointer;color:#bbb;font-size:12px;font-weight:700">Use my own transcript / SRT</summary><div style="color:#777;font-size:11px;line-height:1.5;margin:9px 0">Paste plain text or SRT. SRT timings are preserved; plain text is aligned against detected speech regions.</div><textarea id="transcript" rows="5" placeholder="Paste Punjabi / Hindi / English transcript or SRT…"></textarea><button class="btn" id="useText" style="margin-top:9px" disabled>Use transcript</button></details>
 </div></div>
